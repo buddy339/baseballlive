@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>棒球记分牌 · 手机控制端</title>
+<style>
+  :root {
+    --bg: #0b1418;
+    --card: #10222a;
+    --line: rgba(47, 212, 232, .35);
+    --cyan: #2fd4e8;
+    --cyan-l: #7fe7f7;
+    --yellow: #ffe14d;
+    --red: #ff5b5b;
+    --text: #d6f0f6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    padding: 8px 8px 24px;
+    touch-action: manipulation;
+  }
+
+  /* ---------- 两列布局 ---------- */
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+  .layout > .preview { grid-column: 1 / -1; }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .stack .card { margin-bottom: 0; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px; margin-bottom: 8px;
+  }
+  .layout > .card, .stack > .card { margin-bottom: 0; }
+  .card h3 { font-size: 12px; color: var(--cyan); margin-bottom: 7px; letter-spacing: 1px; }
+  .h3row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+  .h3row .h3t { font-size: 12px; color: var(--cyan); font-weight: bold; letter-spacing: 1px; }
+  .h3row .ftip { font-size: 10px; color: var(--yellow); margin-left: auto; letter-spacing: 0; }
+
+  /* ---------- 顶部比分条 ---------- */
+  .preview {
+    position: relative;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 10px 8px;
+    background: linear-gradient(180deg, #14313b, #0e2028);
+    border: 1px solid var(--line); border-radius: 10px;
+  }
+  .preview .score { font-size: 24px; font-weight: bold; color: var(--yellow); }
+  .preview .tname { font-size: 13px; color: var(--cyan-l); }
+  .preview .inn { font-size: 12px; opacity: .85; margin-left: 2px; }
+  .conn {
+    position: absolute; top: 6px; right: 8px;
+    font-size: 10px; opacity: .9;
+  }
+  .conn .dotlive { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 3px; }
+  .conn.ok  .dotlive { background: #3ddc84; box-shadow: 0 0 5px #3ddc84; }
+  .conn.bad .dotlive { background: var(--red); box-shadow: 0 0 5px var(--red); }
+
+  /* ---------- 布局辅助 ---------- */
+  .line { display: flex; align-items: center; gap: 5px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+
+  /* ---------- 按钮 ---------- */
+  button {
+    font-family: inherit; font-size: 12px; color: var(--text);
+    background: #17323c; border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 4px; min-height: 36px;
+    cursor: pointer; transition: .1s;
+  }
+  button:active { transform: scale(.96); background: #1d4250; }
+  button:disabled { opacity: .35; }
+  button.primary { background: #155e6e; border-color: var(--cyan); color: #eafcff; }
+  button.warn { background: #4a2b2b; border-color: var(--red); color: #ffd9d9; }
+  button.sel { background: #155e6e; border-color: var(--yellow); color: var(--yellow); }
+  button.mini { min-height: 30px; padding: 5px 3px; font-size: 11px; }
+  button.sq { width: 32px; min-height: 30px; padding: 0; font-size: 15px; line-height: 1; flex: none; }
+  /* 得分录入的加减号：加大版 */
+  button.sq-lg { width: 48px; min-height: 42px; padding: 0; font-size: 24px; line-height: 1; flex: none; border-radius: 10px; }
+
+  .innbox {
+    flex: 1; text-align: center; font-size: 15px; font-weight: bold;
+    color: var(--yellow); padding: 6px 0;
+    background: #17323c; border: 1px solid var(--line); border-radius: 8px;
+  }
+
+  /* ---------- BSO 计数行 ---------- */
+  .crow { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
+  .crow:last-of-type { margin-bottom: 0; }
+  .crow .ctag { width: 14px; font-size: 12px; font-weight: bold; color: var(--cyan-l); flex: none; }
+  .crow .dots { display: flex; gap: 4px; flex: 1; }
+  .crow .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--cyan-l); }
+  .crow .dots i.on { background: var(--cyan-l); box-shadow: 0 0 5px var(--cyan-l); }
+  .crow .dots.out i.on { background: var(--red); border-color: var(--red); box-shadow: 0 0 5px var(--red); }
+  .crow button { width: 26px; min-height: 26px; padding: 0; font-size: 13px; line-height: 1; flex: none; }
+
+  .basebtn.on { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 3px; }
+  .chips button { min-height: 24px; padding: 3px 6px; font-size: 11px; }
+  .chips.flexchips button { flex: 1 1 20px; min-width: 0; padding: 3px 0; }
+
+  .val { font-size: 14px; font-weight: bold; color: var(--yellow); min-width: 26px; text-align: center; }
+
+  /* ---------- 表单 ---------- */
+  input[type=text] {
+    width: 100%; font-family: inherit; font-size: 13px; color: #fff;
+    background: #0c1c22; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 8px; min-height: 32px; outline: none;
+  }
+  input[type=text]:focus { border-color: var(--yellow); }
+  .field { margin-bottom: 5px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 10px; color: var(--cyan-l); margin-bottom: 3px; }
+
+  /* ---------- 打序 ---------- */
+  .brow { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+  .bno { width: 30px; min-height: 32px; padding: 0; font-size: 11px; flex: none; }
+  .bno.sel { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
+  .brow input { flex: 1; min-height: 32px; }
+  .brow input.cur { border-color: var(--yellow); }
+
+  /* 打序：全宽卡片 + 内部两列 */
+  .card.full { grid-column: 1 / -1; }
+  .batgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .batcol-head { font-size: 11px; color: var(--cyan-l); text-align: center; margin-bottom: 5px; letter-spacing: 1px; }
+  .batcol-head.cur { color: var(--yellow); font-weight: bold; }
+
+  .tip { font-size: 10px; opacity: .5; margin-top: 5px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- 顶部比分条 -->
+  <div class="preview">
+    <div class="tname" id="pvAway">客队</div>
+    <div class="score" id="pvAwayR">0</div>
+    <div style="opacity:.5;font-size:13px">:</div>
+    <div class="score" id="pvHomeR">0</div>
+    <div class="tname" id="pvHome">主队</div>
+    <div class="inn" id="pvInn">1局上</div>
+    <div class="conn bad" id="conn"><span class="dotlive"></span><span id="connText">连接中</span></div>
+  </div>
+
+  <!-- 左列：局数 -->
+  <div class="card">
+    <div class="h3row"><span class="h3t">局数</span></div>
+    <div class="line">
+      <button id="prevInn" class="mini" style="flex:1" title="上一半局">◀</button>
+      <div class="innbox" id="innNow">1局上</div>
+      <button id="nextInn" class="mini primary" style="flex:1" title="下一半局">▶</button>
+    </div>
+    <div class="line" style="margin-top:6px">
+      <button id="toggleHalf" class="mini" style="flex:1">换上/下</button>
+      <button id="autoSwitch" class="mini" style="flex:1">满3出局:开</button>
+    </div>
+  </div>
+
+  <!-- 右列：球数计数 + 垒包 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">球数计数</span>
+      <button id="resetCount" class="mini" style="margin-left:auto;width:44px">清零</button>
+    </div>
+    <div class="crow">
+      <span class="ctag">B</span>
+      <div class="dots" id="dotsBalls"></div>
+      <button data-key="balls" data-delta="-1">−</button>
+      <button data-key="balls" data-delta="1">＋</button>
+    </div>
+    <div class="crow">
+      <span class="ctag">S</span>
+      <div class="dots" id="dotsStrikes"></div>
+      <button data-key="strikes" data-delta="-1">−</button>
+      <button data-key="strikes" data-delta="1">＋</button>
+    </div>
+    <div class="crow">
+      <span class="ctag">O</span>
+      <div class="dots out" id="dotsOuts"></div>
+      <button data-key="outs" data-delta="-1">−</button>
+      <button data-key="outs" data-delta="1">＋</button>
+    </div>
+    <div class="grid3" style="margin-top:6px">
+      <button class="basebtn" id="base0">一垒</button>
+      <button class="basebtn" id="base1">二垒</button>
+      <button class="basebtn" id="base2">三垒</button>
+    </div>
+  </div>
+
+  <!-- 左列：安打 / 失误 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">场上操作</span>
+      <span class="ftip" id="heTip"></span>
+    </div>
+    <div class="grid2">
+      <button id="btnHit" class="primary">安打 +1</button>
+      <button id="btnError">失误 +1</button>
+    </div>
+  </div>
+
+  <!-- 右列：得分录入 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">得分录入</span>
+      <span class="ftip" id="scoreTip">客队 第1局 0</span>
+    </div>
+    <div class="line">
+      <button id="teamAway" class="mini" style="flex:1">客队</button>
+      <button id="teamHome" class="mini" style="flex:1">主队</button>
+      <button id="scoreClear" class="mini" style="width:44px">清零</button>
+    </div>
+    <div class="chips flexchips" id="inningChips" style="margin-top:5px"></div>
+    <div class="line" style="margin-top:5px;justify-content:center">
+      <button data-score="-1" class="sq-lg">−</button>
+      <div class="val" id="scoreVal">0</div>
+      <button data-score="1" class="sq-lg primary">＋</button>
+    </div>
+  </div>
+
+  <!-- 打序（全宽，左列客队、右列主队） -->
+  <div class="card full">
+    <div class="h3row">
+      <span class="h3t">打序</span>
+      <span class="ftip" id="batterNow">第1棒 —</span>
+    </div>
+    <div class="batgrid">
+      <div>
+        <div class="batcol-head" id="batHeadAway">客队</div>
+        <div id="batterListAway"></div>
+      </div>
+      <div>
+        <div class="batcol-head" id="batHeadHome">主队</div>
+        <div id="batterListHome"></div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:7px">
+      <button id="prevBatter" class="mini">◀ 上一棒</button>
+      <button id="nextBatterBtn" class="mini primary">下一棒 ▶</button>
+    </div>
+    <div class="grid2" style="margin-top:5px">
+      <button id="addBatter" class="mini">＋ 一棒</button>
+      <button id="removeBatter" class="mini">− 末棒</button>
+    </div>
+  </div>
+
+  <!-- 左列：队名/投手 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">队名 / 投手</span>
+      <span class="ftip" id="playerTip">未设置</span>
+    </div>
+    <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
+    <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
+    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label><input type="text" id="pitcher" placeholder="未设置"></div>
+  </div>
+
+  <!-- 右列：扫码/更多 -->
+  <div class="card">
+    <div class="h3row"><span class="h3t">扫码 / 更多</span></div>
+    <div id="qrBlock" style="display:none">
+      <div id="qrBox" style="text-align:center"></div>
+      <div class="line" style="margin-top:6px">
+        <input type="text" id="lanUrl" readonly style="font-size:11px">
+        <button id="copyUrl" class="mini" style="width:46px">复制</button>
+      </div>
+    </div>
+    <button id="resetAll" class="warn" style="width:100%;margin-top:6px">清空比赛数据</button>
+  </div>
+
+</div>
+
+<script src="/core.js"></script>
+<script>
+let curTeam = 1;     // 0=主队 1=客队（默认客队，先攻）
+let curCol  = 0;     // 选中的局（0 基）
+
+const $ = (id) => document.getElementById(id);
+const COUNTS = Sync.COUNTS;   // { balls:3, strikes:2, outs:2 }
+
+/* ---------- 顶部预览 ---------- */
+function renderPreview(s) {
+  $('pvAway').textContent = s.teams[1];
+  $('pvHome').textContent = s.teams[0];
+  $('pvAwayR').textContent = s.scores[1].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+  $('pvHomeR').textContent = s.scores[0].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+  const inn = `${s.inning}局${s.half === 0 ? '上' : '下'}`;
+  $('pvInn').textContent = inn;
+  $('innNow').textContent = inn;
+}
+
+/* ---------- 圆点 ---------- */
+function dotsCount(id) {
+  return id === 'dotsBalls' ? COUNTS.balls : id === 'dotsStrikes' ? COUNTS.strikes : COUNTS.outs;
+}
+function paintDots(id, n) {
+  const box = $(id);
+  const total = dotsCount(id);
+  box.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('i');
+    if (i < n) d.className = 'on';
+    box.appendChild(d);
+  }
+}
+
+/* ---------- 局数 chips ---------- */
+function buildChips(s) {
+  const box = $('inningChips');
+  box.innerHTML = '';
+  for (let i = 0; i < s.innings; i++) {
+    const b = document.createElement('button');
+    b.textContent = String(i + 1);
+    b.addEventListener('click', () => { curCol = i; render(Sync.get()); });
+    box.appendChild(b);
+  }
+}
+
+/* ---------- 输入框（防抖；聚焦时不覆盖） ---------- */
+function bindInput(el, handler) {
+  let timer = null;
+  el.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => handler(el.value), 250);
+  });
+}
+function setInput(el, value) { if (document.activeElement !== el) el.value = value; }
+
+/* ---------- 打序列表（客队/主队两列） ---------- */
+let batterRows = [[], []];   // [主队列, 客队列]
+
+function buildBatterColumn(containerId, teamIdx, list) {
+  const box = $(containerId);
+  box.innerHTML = '';
+  batterRows[teamIdx] = [];
+  list.forEach((name, i) => {
+    const row = document.createElement('div');
+    row.className = 'brow';
+
+    const no = document.createElement('button');
+    no.className = 'bno';
+    no.textContent = String(i + 1);
+    no.title = '设为该队当前打者';
+    no.addEventListener('click', () => Sync.setBatterIdx(teamIdx, i));
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.placeholder = `第${i + 1}棒`;
+    bindInput(inp, (v) => Sync.setBatterName(teamIdx, i, v));
+
+    row.append(no, inp);
+    box.appendChild(row);
+    batterRows[teamIdx].push({ no, inp });
+  });
+}
+
+function renderBatters(s) {
+  // 棒数变化时才重建 DOM，避免打字时丢焦点
+  if ($('batterListHome').children.length !== s.batters[0].length) {
+    buildBatterColumn('batterListAway', 1, s.batters[1]);   // 左列：客队
+    buildBatterColumn('batterListHome', 0, s.batters[0]);   // 右列：主队
+  }
+
+  [0, 1].forEach((teamIdx) => {
+    s.batters[teamIdx].forEach((name, i) => {
+      const row = batterRows[teamIdx][i];
+      if (!row) return;
+      row.no.classList.toggle('sel', i === s.batterIdx[teamIdx]);
+      row.inp.classList.toggle('cur', i === s.batterIdx[teamIdx]);
+      if (document.activeElement !== row.inp) row.inp.value = name;
+    });
+  });
+
+  // 标题与列头
+  const atk = s.half === 0 ? 1 : 0;
+  const cur = s.batters[atk][s.batterIdx[atk]] || '—';
+  $('batterNow').textContent = `${s.teams[atk]} 第${s.batterIdx[atk] + 1}棒 ${cur}`;
+  $('batHeadAway').textContent = s.teams[1];
+  $('batHeadHome').textContent = s.teams[0];
+  $('batHeadAway').classList.toggle('cur', atk === 1);
+  $('batHeadHome').classList.toggle('cur', atk === 0);
+
+  $('addBatter').disabled = s.batters[0].length >= Sync.MAX_BATTERS;
+  $('removeBatter').disabled = s.batters[0].length <= 1;
+}
+
+/* ---------- 主渲染 ---------- */
+function render(s) {
+  renderPreview(s);
+  paintDots('dotsBalls', s.balls);
+  paintDots('dotsStrikes', s.strikes);
+  paintDots('dotsOuts', Math.min(s.outs, COUNTS.outs));   // 圈只有 2 个，满 3 时全亮
+
+  ['base0', 'base1', 'base2'].forEach((id, i) => $(id).classList.toggle('on', !!s.bases[i]));
+
+  const atk = s.half === 0 ? 1 : 0;                       // 上半局客队进攻，下半局主队进攻
+  const def = s.half === 0 ? 0 : 1;
+  $('heTip').textContent = `${s.teams[atk]} H${s.he[atk][0]} · ${s.teams[def]} E${s.he[def][1]}`;
+  $('autoSwitch').textContent = `自动:${s.autoAdvance ? '开' : '关'}`;
+  $('autoSwitch').classList.toggle('sel', !!s.autoAdvance);
+
+  // 得分录入
+  $('teamAway').textContent = s.teams[1];
+  $('teamHome').textContent = s.teams[0];
+  $('teamAway').classList.toggle('sel', curTeam === 1);
+  $('teamHome').classList.toggle('sel', curTeam === 0);
+  if ($('inningChips').children.length !== s.innings) buildChips(s);
+  [...$('inningChips').children].forEach((b, i) => b.classList.toggle('sel', i === curCol));
+  $('scoreVal').textContent = s.scores[curTeam][curCol] || '0';
+  $('scoreTip').textContent = `${s.teams[curTeam]} 第${curCol + 1}局 ${s.scores[curTeam][curCol] || 0}`;
+
+  renderBatters(s);
+
+  setInput($('nameAway'), s.teams[1]);
+  setInput($('nameHome'), s.teams[0]);
+  setInput($('pitcher'), s.pitcher);
+  $('playerTip').textContent = s.pitcher ? `投手 ${s.pitcher}` : '投手未设置';
+}
+
+/* ---------- 局数 ---------- */
+$('prevInn').addEventListener('click', () => Sync.prevHalf());
+$('nextInn').addEventListener('click', () => Sync.nextHalf());
+$('toggleHalf').addEventListener('click', () => Sync.toggleHalf());
+$('resetCount').addEventListener('click', () => Sync.resetCount());
+$('autoSwitch').addEventListener('click', () => Sync.setAutoAdvance(!Sync.get().autoAdvance));
+
+/* ---------- B / S / Out ---------- */
+document.querySelectorAll('[data-key]').forEach((btn) => {
+  const key = btn.dataset.key;
+  const delta = Number(btn.dataset.delta);
+  btn.addEventListener('click', () => {
+    if (key === 'outs') Sync.out(delta);      // 出局 +1 时自动换下一棒
+    else Sync.bumpCount(key, delta);
+  });
+});
+
+/* ---------- 垒包 / 打点 ---------- */
+['base0', 'base1', 'base2'].forEach((id, i) => {
+  $(id).addEventListener('click', () => Sync.toggleBase(i));
+});
+$('btnHit').addEventListener('click', () => Sync.hit());
+$('btnError').addEventListener('click', () => Sync.error());
+
+/* ---------- 得分录入 ---------- */
+$('teamAway').addEventListener('click', () => { curTeam = 1; render(Sync.get()); });
+$('teamHome').addEventListener('click', () => { curTeam = 0; render(Sync.get()); });
+document.querySelectorAll('[data-score]').forEach((btn) => {
+  btn.addEventListener('click', () => Sync.addScore(curTeam, curCol, Number(btn.dataset.score)));
+});
+$('scoreClear').addEventListener('click', () => Sync.setScore(curTeam, curCol, ''));
+
+/* ---------- 打序 ---------- */
+$('prevBatter').addEventListener('click', () => Sync.prevBatter());
+$('nextBatterBtn').addEventListener('click', () => Sync.nextBatter());
+$('addBatter').addEventListener('click', () => Sync.addBatterSlot());
+$('removeBatter').addEventListener('click', () => Sync.removeLastBatter());
+
+/* ---------- 队名 / 投手 ---------- */
+bindInput($('nameHome'), (v) => Sync.setTeamName(0, v));
+bindInput($('nameAway'), (v) => Sync.setTeamName(1, v));
+bindInput($('pitcher'), (v) => Sync.setPitcher(v.trim()));
+
+/* ---------- 更多 ---------- */
+$('resetAll').addEventListener('click', () => {
+  if (confirm('确定清空整场比赛数据？（打序名单会保留）')) Sync.resetAll();
+});
+
+/* ---------- 扫码（仅电脑本机访问时显示） ---------- */
+(function initQR() {
+  const host = location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]') return;
+
+  fetch('/api/info').then((r) => r.json()).then((info) => {
+    $('lanUrl').value = info.controlUrl;
+    $('qrBlock').style.display = '';
+
+    const img = document.createElement('img');
+    img.width = 130; img.height = 130;
+    img.alt = '连接二维码';
+    img.style.cssText = 'border-radius:8px;background:#fff;padding:5px;max-width:100%';
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=130x130&margin=0&data='
+            + encodeURIComponent(info.controlUrl);
+    img.onerror = () => {
+      img.remove();
+      const tip = document.createElement('div');
+      tip.className = 'tip';
+      tip.textContent = '二维码需联网生成，请手动输入下方地址';
+      $('qrBlock').insertBefore(tip, $('qrBlock').firstChild);
+    };
+    $('qrBox').appendChild(img);
+  }).catch(() => {});
+})();
+
+$('copyUrl').addEventListener('click', () => {
+  const input = $('lanUrl');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(input.value).then(() => flash('已复制'), () => fallbackCopy(input));
+  } else {
+    fallbackCopy(input);
+  }
+});
+function fallbackCopy(input) {
+  input.select(); input.setSelectionRange(0, 99);
+  try { document.execCommand('copy'); flash('已复制'); } catch (e) { flash('请手动复制'); }
+}
+function flash(msg) {
+  const btn = $('copyUrl');
+  const old = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(() => { btn.textContent = old; }, 1200);
+}
+
+/* ---------- 连接状态 ---------- */
+Sync.initSync(render, (ok) => {
+  $('conn').className = 'conn ' + (ok ? 'ok' : 'bad');
+  $('connText').textContent = ok ? '已连接' : '已断开';
+});
+</script>
+</body>
+</html>

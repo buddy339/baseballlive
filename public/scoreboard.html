@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>棒球记分牌 · 挂件</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: transparent;          /* OBS 浏览器源保持透明；本地预览可改 #0b1418 */
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    overflow: hidden;
+    user-select: none;
+    /* ★ 整体缩放：1.2 = 再放大20%，0.9 = 缩小10%，改这一个数字即可 */
+    zoom: 1.1;
+  }
+
+  .panel {
+    background: rgba(8, 20, 24, .82);
+    border: 3px solid #2fd4e8;
+    border-radius: 10px;
+    box-shadow: 0 0 14px rgba(47, 212, 232, .55),
+                inset 0 0 16px rgba(47, 212, 232, .18);
+    color: #cfeef4;
+  }
+
+  /* ============ 左上：记分板 ============ */
+  #scoreboard { position: absolute; top: 32px; left: 32px; padding: 11px 14px; }
+  #scoreboard table { border-collapse: collapse; font-size: 18px; }
+  #scoreboard th, #scoreboard td {
+    border: 1px solid rgba(120, 220, 235, .45);
+    min-width: 34px; height: 32px; text-align: center; padding: 0 6px;
+  }
+  #scoreboard th {
+    color: #5fdcec; font-size: 15px; font-weight: bold;
+    background: rgba(47, 212, 232, .08);
+  }
+  #scoreboard td.team { color: #7fe7f7; font-weight: bold; min-width: 72px; }
+  #scoreboard td.runs { color: #ffe14d; font-weight: bold; }
+  #scoreboard td[contenteditable] { cursor: text; }
+  #scoreboard td[contenteditable]:focus { outline: 1px dashed #ffe14d; background: rgba(255, 225, 77, .12); }
+
+  /* ============ 左下：投手 / 打者 ============ */
+  #players { position: absolute; left: 32px; bottom: 32px; padding: 13px 22px; font-size: 18px; line-height: 1.9; }
+  #players .label { color: #5fdcec; font-size: 15px; margin-right: 12px; }
+  #players .name { color: #fff; font-weight: bold; cursor: text; }
+  #players .name:focus { outline: 1px dashed #ffe14d; }
+
+  /* ============ 右下：局数 + BSO + 垒包 ============ */
+  #status { position: absolute; right: 32px; bottom: 32px; padding: 14px 20px; display: flex; align-items: center; gap: 18px; }
+  #inning { color: #ffe14d; font-size: 27px; font-weight: bold; cursor: pointer; white-space: nowrap; text-align: center; }
+  #inning small { display: block; font-size: 14px; color: #9adfe9; font-weight: normal; }
+  .counts { font-size: 16px; }
+  .counts .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .counts .tag { color: #5fdcec; width: 46px; font-weight: bold; }
+  .dot { display: inline-block; width: 15px; height: 15px; border-radius: 50%; border: 2px solid #7fe7f7; cursor: pointer; }
+  .dot.on { background: #7fe7f7; box-shadow: 0 0 8px #7fe7f7; }
+  .dot.out.on { background: #ff5b5b; border-color: #ff5b5b; box-shadow: 0 0 8px #ff5b5b; }
+
+  /* B 坏球 = 浅绿，S 好球 = 黄，Out = 红 */
+  #balls .dot { border-color: #7ef7a5; }
+  #balls .dot.on { background: #7ef7a5; box-shadow: 0 0 8px #7ef7a5; }
+  #strikes .dot { border-color: #ffe14d; }
+  #strikes .dot.on { background: #ffe14d; box-shadow: 0 0 8px #ffe14d; }
+
+  #bases { position: relative; width: 74px; height: 68px; margin-left: 6px; }
+  .base {
+    position: absolute; width: 20px; height: 20px; transform: rotate(45deg);
+    border: 2px solid #7fe7f7; background: rgba(8, 20, 24, .6); cursor: pointer;
+  }
+  .base.on { background: #ffe14d; border-color: #ffe14d; box-shadow: 0 0 10px #ffe14d; }
+  #b2 { top: 0;  left: 27px; }
+  #b3 { top: 24px; left: 0; }
+  #b1 { top: 24px; left: 54px; }
+
+  #hint { position: absolute; top: 8px; right: 12px; font-size: 11px; color: rgba(200, 240, 248, .45); }
+  #hint.off { display: none; }
+</style>
+</head>
+<body>
+
+  <div id="scoreboard" class="panel">
+    <table id="scoreTable">
+      <thead><tr></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div id="players" class="panel">
+    <div id="pitcherRow"><span class="label">投手</span><span class="name" id="pitcherName" contenteditable="true"></span></div>
+    <div id="batterRow"><span class="label">打者</span><span class="name" id="batterName" contenteditable="true"></span></div>
+  </div>
+
+  <div id="status" class="panel">
+    <div id="inning" title="点击推进半局，Shift+点击回退">
+      <span id="inningText">1局上</span><small>点击切换</small>
+    </div>
+    <div class="counts">
+      <div class="row"><span class="tag">B:</span><span id="balls"></span></div>
+      <div class="row"><span class="tag">S:</span><span id="strikes"></span></div>
+      <div class="row"><span class="tag">Out</span><span id="outs"></span></div>
+    </div>
+    <div id="bases">
+      <div class="base" id="b1" title="一垒"></div>
+      <div class="base" id="b2" title="二垒"></div>
+      <div class="base" id="b3" title="三垒"></div>
+    </div>
+  </div>
+
+  <div id="hint">手机控制：同一 WiFi 访问 “电脑IP:8080” · 按 H 隐藏提示</div>
+
+<script src="/core.js"></script>
+<script>
+const theadRow = document.querySelector('#scoreTable thead tr');
+const tbody    = document.querySelector('#scoreTable tbody');
+let editing = false;   // 正在编辑文本时不重建 DOM，避免光标丢失
+
+/* ---------- 记分板 ---------- */
+function buildTable(s) {
+  theadRow.innerHTML = '<th>队伍</th>';
+  for (let i = 1; i <= s.innings; i++) {
+    const th = document.createElement('th');
+    th.textContent = i;
+    theadRow.appendChild(th);
+  }
+  ['H', 'E', 'R'].forEach((t) => {
+    const th = document.createElement('th');
+    th.textContent = t;
+    theadRow.appendChild(th);
+  });
+
+  tbody.innerHTML = '';
+  // 显示顺序：客队在上、主队在下
+  Sync.TEAM_ORDER.forEach((r) => {
+    const team = s.teams[r];
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'team';
+    nameTd.textContent = team;
+    nameTd.contentEditable = true;
+    bindText(nameTd, () => Sync.setTeamName(r, nameTd.textContent.trim()));
+    tr.appendChild(nameTd);
+
+    for (let c = 0; c < s.innings; c++) {
+      const td = document.createElement('td');
+      td.textContent = s.scores[r][c] || '';
+      td.contentEditable = true;
+      bindText(td, () => Sync.setScore(r, c, td.textContent.trim()));
+      tr.appendChild(td);
+    }
+
+    [0, 1].forEach((idx) => {
+      const td = document.createElement('td');
+      td.textContent = s.he[r][idx] || '';
+      td.contentEditable = true;
+      bindText(td, () => Sync.setHE(r, idx, td.textContent.trim()));
+      tr.appendChild(td);
+    });
+
+    const rTd = document.createElement('td');
+    rTd.className = 'runs';
+    rTd.textContent = s.scores[r].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+    tr.appendChild(rTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function bindText(el, commit) {
+  el.addEventListener('focus', () => { editing = true; });
+  el.addEventListener('blur', () => {
+    editing = false;
+    commit();
+    setTimeout(() => render(Sync.get()), 150);   // 提交后再拉一次最新状态
+  });
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+}
+
+/* ---------- 局数 / BSO / 垒包 ---------- */
+function renderInning(s) {
+  document.getElementById('inningText').textContent = `${s.inning}局${s.half === 0 ? '上' : '下'}`;
+}
+function buildDots(id, max) {
+  const box = document.getElementById(id);
+  box.innerHTML = '';
+  for (let i = 0; i < max; i++) {
+    const d = document.createElement('span');
+    d.className = 'dot' + (id === 'outs' ? ' out' : '');
+    d.dataset.idx = i;
+    d.addEventListener('click', () => {
+      const cur = Sync.get()[id] | 0;
+      Sync.setCount(id, (i + 1 === cur) ? i : i + 1);
+    });
+    box.appendChild(d);
+  }
+}
+function paint(id, n) {
+  document.getElementById(id).querySelectorAll('.dot')
+    .forEach((d) => d.classList.toggle('on', +d.dataset.idx < n));
+}
+
+function render(s) {
+  if (editing) return;                       // 编辑中不重建，防光标丢失
+  buildTable(s);
+  renderInning(s);
+  paint('balls', s.balls);
+  paint('strikes', s.strikes);
+  // 出局圈只画 2 个，第 3 出局时 2 个全亮（随后由服务端换半局清零）
+  paint('outs', Math.min(s.outs, Sync.COUNTS.outs));
+  ['b1', 'b2', 'b3'].forEach((id, i) => document.getElementById(id).classList.toggle('on', !!s.bases[i]));
+
+  const atk = s.half === 0 ? 1 : 0;                // 上半局客队进攻，下半局主队进攻
+  const currentBatter = s.batters[atk][s.batterIdx[atk]] || '';
+  const p = document.getElementById('pitcherName');
+  const b = document.getElementById('batterName');
+  if (document.activeElement !== p) p.textContent = s.pitcher || '';
+  if (document.activeElement !== b) b.textContent = currentBatter;
+
+  // 名字没录入就整行隐藏；两行都空则整个面板隐藏
+  document.getElementById('pitcherRow').style.display = s.pitcher ? '' : 'none';
+  document.getElementById('batterRow').style.display = currentBatter ? '' : 'none';
+  document.getElementById('players').style.display = (s.pitcher || currentBatter) ? '' : 'none';
+}
+
+/* ---------- 本地点击也能改（浏览器里调试用） ---------- */
+document.getElementById('inning').addEventListener('click', (e) => {
+  e.shiftKey ? Sync.prevHalf() : Sync.nextHalf();
+});
+['b1', 'b2', 'b3'].forEach((id, i) => {
+  document.getElementById(id).addEventListener('click', () => Sync.toggleBase(i));
+});
+const pName = document.getElementById('pitcherName');
+const bName = document.getElementById('batterName');
+bindText(pName, () => Sync.setPitcher(pName.textContent.trim()));
+bindText(bName, () => {
+  const st = Sync.get();
+  const atk = st.half === 0 ? 1 : 0;
+  Sync.setBatterName(atk, st.batterIdx[atk], bName.textContent.trim());
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'h') document.getElementById('hint').classList.toggle('off');
+});
+
+/* ---------- 启动同步 ---------- */
+buildDots('balls', Sync.COUNTS.balls);
+buildDots('strikes', Sync.COUNTS.strikes);
+buildDots('outs', Sync.COUNTS.outs);
+Sync.initSync(render, (ok) => {
+  document.getElementById('hint').textContent = ok
+    ? '已连接控制服务器 · 手机访问 “电脑IP:8080” · 按 H 隐藏提示'
+    : '未连接服务器（请先运行 server.js）· 按 H 隐藏提示';
+});
+</script>
+</body>
+</html>
