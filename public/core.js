@@ -11,6 +11,10 @@
   const DEFAULT_STATE = {
     innings: 7,
     teams: ['主队', '客队'],                   // 索引 0=主队 1=客队（与显示顺序无关）
+    logos: ['', ''],                           // 队徽图片（dataURL）[主队, 客队]，空则不显示队徽列
+    matchName: '',                             // 比赛名称，空则挂件右上角不显示
+    orgLogo: '',                               // 主办方 Logo（dataURL），空则不显示
+    ageGroup: '',                              // 年龄段：U8/U10/U12/other；U8/U10 时挂件隐藏 E 列和 B/S
     scores: [Array(MAX_INNINGS).fill(''), Array(MAX_INNINGS).fill('')],
     he: [[0, 0], [0, 0]],
     pitcher: '',                               // 留空则挂件不显示投手
@@ -24,6 +28,12 @@
     bases: [false, false, false],
     autoAdvance: true
   };
+
+  /* 场次基址：/g/2/... 页面下所有请求自动带 /g/2 前缀；旧地址则归 1 号场 */
+  const BASE = (function () {
+    const m = location.pathname.match(/^\/g\/([^/]+)/);
+    return m ? '/g/' + m[1] : '';
+  })();
 
   let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   let onState = null;
@@ -42,12 +52,12 @@
     onState = stateHandler;
     onConn = connHandler;
 
-    fetch('/api/state')
+    fetch(BASE + '/api/state')
       .then((r) => r.json())
       .then((s) => { apply(s); setConn(true); })
       .catch(() => setConn(false));
 
-    es = new EventSource('/stream');
+    es = new EventSource(BASE + '/stream');
     es.onopen = () => setConn(true);
     es.onerror = () => setConn(false);
     es.onmessage = (e) => {
@@ -57,7 +67,7 @@
 
   /** 提交局部更新，服务端合并后广播给所有端 */
   function patch(partial) {
-    fetch('/api/state', {
+    fetch(BASE + '/api/state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partial)
@@ -128,6 +138,7 @@
     MAX_BATTERS,
     TEAM_ORDER,
     DEFAULT_STATE,
+    BASE,
     initSync,
     patch,
     get: () => state,
@@ -154,6 +165,14 @@
       patch({ he });
     },
     setPitcher(name) { patch({ pitcher: name }); },
+    setMatchName(name) { patch({ matchName: name }); },
+    setAgeGroup(g) { patch({ ageGroup: g }); },
+    setOrgLogo(dataUrl) { patch({ orgLogo: dataUrl || '' }); },
+    setLogo(team, dataUrl) {
+      const logos = (state.logos || ['', '']).slice();
+      logos[team] = dataUrl || '';
+      patch({ logos });
+    },
 
     /* ---- 打序（主队/客队各一套，索引与 teams 对应：0=主队 1=客队） ---- */
     setBatterName(team, pos, name) {
@@ -237,6 +256,8 @@
     /** 安打：进攻方 H +1 并推进垒包；失误：防守方 E +1 */
     hit() { patch(simulateHit()); },
     error() { patch(simulateError()); },
+    /** 清除两队 H/E */
+    clearHE() { patch({ he: [[0, 0], [0, 0]] }); },
     attackingTeam,
     defendingTeam,
     setAutoAdvance(on) { patch({ autoAdvance: !!on }); },
@@ -247,7 +268,9 @@
         he: [[0, 0], [0, 0]],
         inning: 1, half: 0, balls: 0, strikes: 0, outs: 0,
         bases: [false, false, false],
-        batterIdx: [0, 0]                              // 清空比赛数据但保留两队打序名单
+        batterIdx: [0, 0],                             // 清空比赛数据但保留两队打序名单
+        playerStats: null,                             // 队员统计一并清零
+        pitchers: null                                 // 投手统计一并清零
       });
     }
   };

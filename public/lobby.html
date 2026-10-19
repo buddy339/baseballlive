@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>棒球记分牌 · 场地选择</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #0b1220;
+    color: #e8f6ff;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px 40px;
+  }
+  h1 { font-size: 24px; letter-spacing: 2px; margin-bottom: 6px; }
+  .sub { color: #7fa8c9; font-size: 13px; margin-bottom: 24px; text-align: center; line-height: 1.7; }
+  .cards { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; width: 100%; max-width: 860px; }
+  .card {
+    flex: 1 1 300px; max-width: 400px;
+    background: rgba(20, 40, 60, .65);
+    border: 2px solid #35e0ff; border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 0 18px rgba(53, 224, 255, .25);
+  }
+  .card h2 { font-size: 19px; color: #35e0ff; margin-bottom: 12px; }
+  .row { margin-bottom: 12px; }
+  .row label { display: block; font-size: 12px; color: #7fa8c9; margin-bottom: 4px; }
+  .row input {
+    width: 100%; padding: 8px 10px; font-size: 13px;
+    background: #0b1626; color: #e8f6ff;
+    border: 1px solid #2b4a63; border-radius: 8px;
+  }
+  .btns { display: flex; gap: 8px; margin-top: 4px; }
+  .btns a, .btns button {
+    flex: 1; text-align: center; text-decoration: none;
+    padding: 9px 0; font-size: 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #35e0ff; color: #35e0ff; background: transparent;
+  }
+  .btns a.primary { background: #35e0ff; color: #06222e; font-weight: 700; }
+  .qr { text-align: center; margin-top: 12px; }
+  .qr img { border-radius: 8px; background: #fff; padding: 6px; }
+  .qr .tip { font-size: 12px; color: #7fa8c9; margin-top: 6px; }
+  .addbar { margin-top: 26px; display: flex; gap: 8px; align-items: center; }
+  .addbar input {
+    width: 90px; padding: 9px 10px; font-size: 15px; text-align: center;
+    background: #0b1626; color: #e8f6ff; border: 1px solid #2b4a63; border-radius: 8px;
+  }
+  .addbar button {
+    padding: 9px 18px; font-size: 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #35e0ff; color: #35e0ff; background: transparent;
+  }
+</style>
+</head>
+<body>
+  <h1>⚾ 棒球记分牌 · 场地选择</h1>
+  <div class="sub">每个场地一套独立比分，互不影响。手机扫码进入对应场地的控制端；<br>OBS 浏览器源填写对应场地的挂件地址。</div>
+  <div class="cards" id="cards"></div>
+  <div class="addbar">
+    <span style="font-size:13px;color:#7fa8c9">还要更多场地？输入编号</span>
+    <input id="newId" type="number" min="1" value="3">
+    <button onclick="addField(document.getElementById('newId').value)">添加场地</button>
+  </div>
+
+<script>
+  const cardIds = ['1', '2'];      // 默认展示 1、2 号场
+  let lanBase = location.origin;   // 稍后从 /api/info 换成局域网 IP
+
+  function fieldUrls(id) {
+    return {
+      control: lanBase + '/g/' + id + '/',
+      board: location.origin + '/g/' + id + '/board'
+    };
+  }
+
+  function addField(id) {
+    id = String(parseInt(id, 10) || '').trim();
+    if (!id || cardIds.includes(id)) return;
+    cardIds.push(id);
+    render();
+  }
+
+  function render() {
+    const wrap = document.getElementById('cards');
+    wrap.innerHTML = '';
+    cardIds.forEach((id) => {
+      const u = fieldUrls(id);
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML =
+        '<h2>' + id + ' 号场</h2>' +
+        '<div class="row"><label>手机控制端（手机浏览器打开）</label><input readonly value="' + u.control + '"></div>' +
+        '<div class="row"><label>挂件地址（OBS 浏览器源）</label><input readonly value="' + u.board + '"></div>' +
+        '<div class="btns"><a class="primary" href="/g/' + id + '/">打开控制端</a><a href="/g/' + id + '/board" target="_blank">打开挂件</a></div>' +
+        '<div class="qr" data-url="' + u.control + '"></div>';
+      wrap.appendChild(card);
+    });
+    renderQR();
+  }
+
+  function renderQR() {
+    document.querySelectorAll('.qr').forEach((box) => {
+      box.innerHTML = '';
+      const url = box.getAttribute('data-url');
+      const img = document.createElement('img');
+      img.width = 130; img.height = 130; img.alt = '扫码进入控制端';
+      img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=130x130&margin=0&data=' + encodeURIComponent(url);
+      img.onerror = () => { img.remove(); };
+      box.appendChild(img);
+      const tip = document.createElement('div');
+      tip.className = 'tip';
+      tip.textContent = '手机扫码进入该场控制端';
+      box.appendChild(tip);
+    });
+  }
+
+  // 电脑本机访问时，把链接换成局域网 IP，手机才能扫码连上
+  fetch('/api/info').then((r) => r.json()).then((info) => {
+    lanBase = 'http://' + info.ip + ':' + info.port;
+    render();
+  }).catch(() => render());
+</script>
+</body>
+</html>

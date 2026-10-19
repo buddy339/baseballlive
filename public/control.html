@@ -77,6 +77,7 @@
   button.warn { background: #4a2b2b; border-color: var(--red); color: #ffd9d9; }
   button.sel { background: #155e6e; border-color: var(--yellow); color: var(--yellow); }
   button.mini { min-height: 30px; padding: 5px 3px; font-size: 11px; }
+  .logoPrev { width: 28px; height: 28px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; }
   button.sq { width: 32px; min-height: 30px; padding: 0; font-size: 15px; line-height: 1; flex: none; }
   /* 得分录入的加减号：加大版 */
   button.sq-lg { width: 48px; min-height: 42px; padding: 0; font-size: 24px; line-height: 1; flex: none; border-radius: 10px; }
@@ -130,9 +131,35 @@
   .batcol-head.cur { color: var(--yellow); font-weight: bold; }
 
   .tip { font-size: 10px; opacity: .5; margin-top: 5px; line-height: 1.5; }
+
+  /* ---------- 年龄段选择页（未选择时全屏覆盖） ---------- */
+  #ageGate {
+    position: fixed; inset: 0; z-index: 99;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px;
+  }
+  #ageGate h2 { font-size: 20px; color: var(--cyan); letter-spacing: 2px; }
+  #ageGate .sub { font-size: 12px; opacity: .6; margin-bottom: 10px; }
+  #ageGate button {
+    width: 100%; max-width: 300px; padding: 16px 0;
+    font-size: 20px; font-weight: bold; border-radius: 12px; cursor: pointer;
+    background: #123240; color: var(--cyan-l); border: 2px solid var(--cyan);
+  }
+  #ageGate button:active { background: var(--cyan); color: #06222e; }
 </style>
 </head>
 <body>
+
+<!-- 年龄段选择页：未选择时全屏覆盖，选完进入控制端 -->
+<div id="ageGate" style="display:none">
+  <h2>⚾ 选择比赛年龄段</h2>
+  <div class="sub">U8 / U10 的挂件不显示 E 列和好/坏球</div>
+  <button data-age="U8">U8</button>
+  <button data-age="U10">U10</button>
+  <button data-age="U12">U12</button>
+  <button data-age="other">其他</button>
+</div>
 
 <div class="layout">
 
@@ -147,7 +174,9 @@
     <div class="conn bad" id="conn"><span class="dotlive"></span><span id="connText">连接中</span></div>
   </div>
 
-  <!-- 左列：局数 -->
+<div class="stack">
+
+  <!-- 局数 -->
   <div class="card">
     <div class="h3row"><span class="h3t">局数</span></div>
     <div class="line">
@@ -161,7 +190,24 @@
     </div>
   </div>
 
-  <!-- 右列：球数计数 + 垒包 -->
+  <!-- 比赛信息（显示在挂件右上角） -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">比赛信息</span>
+      <span class="ftip">显示在挂件右上角</span>
+    </div>
+    <div class="field"><label>比赛名称（空则不显示）</label><input type="text" id="matchName" placeholder="如：XX杯棒球邀请赛"></div>
+    <div class="field" style="margin-top:5px"><label>主办方 Logo（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="orgLogoBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="orgLogoPrev" style="display:none" alt="">
+        <button class="mini" id="orgLogoClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="orgLogoFile" accept="image/*" hidden>
+    </div>
+  </div>
+
+  <!-- 球数计数 + 垒包 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">球数计数</span>
@@ -192,7 +238,7 @@
     </div>
   </div>
 
-  <!-- 左列：安打 / 失误 -->
+  <!-- 安打 / 失误 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">场上操作</span>
@@ -202,9 +248,41 @@
       <button id="btnHit" class="primary">安打 +1</button>
       <button id="btnError">失误 +1</button>
     </div>
+    <button id="btnHeClear" class="mini" style="width:100%;margin-top:5px">清除 H / E</button>
   </div>
 
-  <!-- 右列：得分录入 -->
+</div>
+
+<div class="stack">
+
+  <!-- 队名/投手 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">队名 / 投手</span>
+      <span class="ftip" id="playerTip">未设置</span>
+    </div>
+    <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
+    <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
+    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label><input type="text" id="pitcher" placeholder="未设置"></div>
+    <div class="field" style="margin-top:5px"><label>客队徽（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="logoAwayBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="logoAwayPrev" style="display:none" alt="">
+        <button class="mini" id="logoAwayClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="logoAwayFile" accept="image/*" hidden>
+    </div>
+    <div class="field" style="margin-top:5px"><label>主队徽（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="logoHomeBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="logoHomePrev" style="display:none" alt="">
+        <button class="mini" id="logoHomeClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="logoHomeFile" accept="image/*" hidden>
+    </div>
+  </div>
+
+  <!-- 得分录入 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">得分录入</span>
@@ -222,6 +300,29 @@
       <button data-score="1" class="sq-lg primary">＋</button>
     </div>
   </div>
+
+  <!-- 扫码/更多 -->
+  <div class="card">
+    <div class="h3row"><span class="h3t">扫码 / 更多</span></div>
+    <div class="line" style="margin-bottom:6px">
+      <span style="font-size:11px;color:var(--cyan-l)">年龄段</span>
+      <button class="mini ageChip" data-age="U8" style="flex:1">U8</button>
+      <button class="mini ageChip" data-age="U10" style="flex:1">U10</button>
+      <button class="mini ageChip" data-age="U12" style="flex:1">U12</button>
+      <button class="mini ageChip" data-age="other" style="flex:1">其他</button>
+    </div>
+    <div id="qrBlock" style="display:none">
+      <div id="qrBox" style="text-align:center"></div>
+      <div class="line" style="margin-top:6px">
+        <input type="text" id="lanUrl" readonly style="font-size:11px">
+        <button id="copyUrl" class="mini" style="width:46px">复制</button>
+      </div>
+    </div>
+    <button id="btnExport" class="primary" style="width:100%;margin-top:6px">结束比赛 · 导出数据表</button>
+    <button id="resetAll" class="warn" style="width:100%;margin-top:6px">清空比赛数据</button>
+  </div>
+
+</div>
 
   <!-- 打序（全宽，左列客队、右列主队） -->
   <div class="card full">
@@ -247,30 +348,6 @@
       <button id="addBatter" class="mini">＋ 一棒</button>
       <button id="removeBatter" class="mini">− 末棒</button>
     </div>
-  </div>
-
-  <!-- 左列：队名/投手 -->
-  <div class="card">
-    <div class="h3row">
-      <span class="h3t">队名 / 投手</span>
-      <span class="ftip" id="playerTip">未设置</span>
-    </div>
-    <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
-    <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
-    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label><input type="text" id="pitcher" placeholder="未设置"></div>
-  </div>
-
-  <!-- 右列：扫码/更多 -->
-  <div class="card">
-    <div class="h3row"><span class="h3t">扫码 / 更多</span></div>
-    <div id="qrBlock" style="display:none">
-      <div id="qrBox" style="text-align:center"></div>
-      <div class="line" style="margin-top:6px">
-        <input type="text" id="lanUrl" readonly style="font-size:11px">
-        <button id="copyUrl" class="mini" style="width:46px">复制</button>
-      </div>
-    </div>
-    <button id="resetAll" class="warn" style="width:100%;margin-top:6px">清空比赛数据</button>
   </div>
 
 </div>
@@ -391,6 +468,7 @@ function renderBatters(s) {
 
 /* ---------- 主渲染 ---------- */
 function render(s) {
+  paintAge(s);
   renderPreview(s);
   paintDots('dotsBalls', s.balls);
   paintDots('dotsStrikes', s.strikes);
@@ -419,6 +497,11 @@ function render(s) {
   setInput($('nameAway'), s.teams[1]);
   setInput($('nameHome'), s.teams[0]);
   setInput($('pitcher'), s.pitcher);
+  paintLogo(1, 'logoAwayPrev', 'logoAwayClear');
+  paintLogo(0, 'logoHomePrev', 'logoHomeClear');
+  setInput($('matchName'), s.matchName || '');
+  if (s.orgLogo) { $('orgLogoPrev').src = s.orgLogo; $('orgLogoPrev').style.display = ''; $('orgLogoClear').style.display = ''; }
+  else { $('orgLogoPrev').style.display = 'none'; $('orgLogoClear').style.display = 'none'; }
   $('playerTip').textContent = s.pitcher ? `投手 ${s.pitcher}` : '投手未设置';
 }
 
@@ -445,6 +528,9 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
 });
 $('btnHit').addEventListener('click', () => Sync.hit());
 $('btnError').addEventListener('click', () => Sync.error());
+$('btnHeClear').addEventListener('click', () => {
+  if (confirm('确定清除两队的 H / E 计数？')) Sync.clearHE();
+});
 
 /* ---------- 得分录入 ---------- */
 $('teamAway').addEventListener('click', () => { curTeam = 1; render(Sync.get()); });
@@ -465,9 +551,107 @@ bindInput($('nameHome'), (v) => Sync.setTeamName(0, v));
 bindInput($('nameAway'), (v) => Sync.setTeamName(1, v));
 bindInput($('pitcher'), (v) => Sync.setPitcher(v.trim()));
 
+/* ---------- 队徽上传（压缩到 64px，省流量；空则不显示） ---------- */
+function bindLogo(team, btnId, fileId, prevId, clearId) {
+  const btn = $(btnId), file = $(fileId);
+  btn.addEventListener('click', () => file.click());
+  file.addEventListener('change', () => {
+    const f = file.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const S = 64;
+      const cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+      const scale = Math.min(S / img.width, S / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+      URL.revokeObjectURL(img.src);
+      Sync.setLogo(team, cv.toDataURL('image/png'));
+      file.value = '';
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  $(clearId).addEventListener('click', () => Sync.setLogo(team, ''));
+}
+bindLogo(1, 'logoAwayBtn', 'logoAwayFile', 'logoAwayPrev', 'logoAwayClear');   // 客队 = 索引1
+bindLogo(0, 'logoHomeBtn', 'logoHomeFile', 'logoHomePrev', 'logoHomeClear');   // 主队 = 索引0
+
+/* ---------- 比赛名称 / 主办方 Logo ---------- */
+bindInput($('matchName'), (v) => Sync.setMatchName(v.trim()));
+$('orgLogoBtn').addEventListener('click', () => $('orgLogoFile').click());
+$('orgLogoFile').addEventListener('change', () => {
+  const f = $('orgLogoFile').files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const S = 96;
+    const cv = document.createElement('canvas');
+    cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d');
+    const scale = Math.min(S / img.width, S / img.height);
+    const w = img.width * scale, h = img.height * scale;
+    ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+    URL.revokeObjectURL(img.src);
+    Sync.setOrgLogo(cv.toDataURL('image/png'));
+    $('orgLogoFile').value = '';
+  };
+  img.src = URL.createObjectURL(f);
+});
+$('orgLogoClear').addEventListener('click', () => Sync.setOrgLogo(''));
+
+/* ---------- 年龄段：全屏选择页 + 扫码卡内快捷切换 ---------- */
+const AGE_LABEL = { U8: 'U8', U10: 'U10', U12: 'U12', other: '其他' };
+document.querySelectorAll('#ageGate button, .ageChip').forEach((b) => {
+  b.addEventListener('click', () => Sync.setAgeGroup(b.dataset.age));
+});
+function paintAge(s) {
+  $('ageGate').style.display = s.ageGroup ? 'none' : 'flex';
+  document.querySelectorAll('.ageChip').forEach((b) => {
+    const on = b.dataset.age === s.ageGroup;
+    b.classList.toggle('sel', on);
+  });
+}
+
+function paintLogo(team, prevId, clearId) {
+  const url = (Sync.get().logos || [])[team] || '';
+  const prev = $(prevId), clear = $(clearId);
+  if (url) { prev.src = url; prev.style.display = ''; clear.style.display = ''; }
+  else { prev.style.display = 'none'; clear.style.display = 'none'; }
+}
+
 /* ---------- 更多 ---------- */
 $('resetAll').addEventListener('click', () => {
   if (confirm('确定清空整场比赛数据？（打序名单会保留）')) Sync.resetAll();
+});
+
+/* ---------- 结束比赛：导出数据表到桌面，并自动清空全部内容 ---------- */
+$('btnExport').addEventListener('click', () => {
+  if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会自动清空所有内容，准备下一场。')) return;
+  fetch(Sync.BASE + '/api/export', { method: 'POST' })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d.ok) { alert('导出失败：' + (d.error || '未知错误')); return; }
+      flash('已存到桌面');
+      Sync.patch({
+        teams: ['主队', '客队'],
+        logos: ['', ''],
+        matchName: '',
+        orgLogo: '',
+        ageGroup: '',                                  // 清空后回到年龄段选择页
+        scores: [Array(Sync.MAX_INNINGS).fill(''), Array(Sync.MAX_INNINGS).fill('')],
+        he: [[0, 0], [0, 0]],
+        pitcher: '',
+        batters: [Array(9).fill(''), Array(9).fill('')],
+        batterIdx: [0, 0],
+        inning: 1, half: 0, balls: 0, strikes: 0, outs: 0,
+        bases: [false, false, false],
+        playerStats: null,                       // 队员统计清零
+        pitchers: null                           // 投手统计清零
+      });
+    })
+    .catch(() => alert('导出失败：无法连接服务器'));
 });
 
 /* ---------- 扫码（仅电脑本机访问时显示） ---------- */
@@ -475,7 +659,7 @@ $('resetAll').addEventListener('click', () => {
   const host = location.hostname;
   if (host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]') return;
 
-  fetch('/api/info').then((r) => r.json()).then((info) => {
+  fetch(Sync.BASE + '/api/info').then((r) => r.json()).then((info) => {
     $('lanUrl').value = info.controlUrl;
     $('qrBlock').style.display = '';
 
