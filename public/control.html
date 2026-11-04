@@ -25,14 +25,15 @@
   }
 
   /* ---------- 两列布局 ---------- */
-  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+  .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; min-width: 0; }
   .layout > .preview { grid-column: 1 / -1; }
-  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .stack .card { margin-bottom: 0; }
 
   .card {
     background: var(--card); border: 1px solid var(--line);
     border-radius: 10px; padding: 9px; margin-bottom: 8px;
+    min-width: 0;
   }
   .layout > .card, .stack > .card { margin-bottom: 0; }
   .card h3 { font-size: 12px; color: var(--cyan); margin-bottom: 7px; letter-spacing: 1px; }
@@ -77,6 +78,7 @@
   button.warn { background: #4a2b2b; border-color: var(--red); color: #ffd9d9; }
   button.sel { background: #155e6e; border-color: var(--yellow); color: var(--yellow); }
   button.mini { min-height: 30px; padding: 5px 3px; font-size: 11px; }
+  .logoPrev { width: 28px; height: 28px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; }
   button.sq { width: 32px; min-height: 30px; padding: 0; font-size: 15px; line-height: 1; flex: none; }
   /* 得分录入的加减号：加大版 */
   button.sq-lg { width: 48px; min-height: 42px; padding: 0; font-size: 24px; line-height: 1; flex: none; border-radius: 10px; }
@@ -86,6 +88,14 @@
     color: var(--yellow); padding: 6px 0;
     background: #17323c; border: 1px solid var(--line); border-radius: 8px;
   }
+
+  /* ---------- 局数横条：整行一栏（局数 + 前后翻页在左，换半局/自动在右） ---------- */
+  .innbar { display: flex; align-items: center; gap: 5px; padding: 7px 8px; }
+  .innbar .h3t { font-size: 11px; color: var(--cyan); font-weight: bold; letter-spacing: 1px; flex: none; }
+  .innbar .innbox { flex: 1; min-width: 56px; font-size: 13px; padding: 4px 0; }
+  .innbar button.sq { width: 34px; min-height: 32px; padding: 0; font-size: 13px; line-height: 1; flex: none; }
+  .innbar #toggleHalf { margin-left: auto; width: 58px; flex: none; padding: 4px 2px; font-size: 11px; min-height: 32px; }
+  .innbar #autoSwitch { width: 62px; flex: none; padding: 4px 2px; font-size: 11px; min-height: 32px; }
 
   /* ---------- BSO 计数行 ---------- */
   .crow { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
@@ -109,7 +119,7 @@
   input[type=text] {
     width: 100%; font-family: inherit; font-size: 13px; color: #fff;
     background: #0c1c22; border: 1px solid var(--line); border-radius: 8px;
-    padding: 7px 8px; min-height: 32px; outline: none;
+    padding: 7px 8px; min-height: 32px; outline: none; min-width: 0;
   }
   input[type=text]:focus { border-color: var(--yellow); }
   .field { margin-bottom: 5px; }
@@ -117,22 +127,301 @@
   .field label { display: block; font-size: 10px; color: var(--cyan-l); margin-bottom: 3px; }
 
   /* ---------- 打序 ---------- */
-  .brow { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+  .brow { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; min-width: 0; }
   .bno { width: 30px; min-height: 32px; padding: 0; font-size: 11px; flex: none; }
   .bno.sel { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
-  .brow input { flex: 1; min-height: 32px; }
+  .brow input { flex: 1; min-width: 0; min-height: 32px; }
   .brow input.cur { border-color: var(--yellow); }
 
-  /* 打序：全宽卡片 + 内部两列 */
+  /* 打序：全宽卡片 + 双列（客队左 / 主队右，同时显示） */
   .card.full { grid-column: 1 / -1; }
-  .batgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .batcols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; min-width: 0; }
+  .batcol { min-width: 0; }
+  .batcol-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 4px; margin-bottom: 5px; padding-bottom: 3px;
+    font-size: 12px; font-weight: bold; color: var(--cyan-l);
+    border-bottom: 1px solid var(--line); min-width: 0;
+  }
+  .batcol-head > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batcol-head.atk { color: var(--yellow); border-bottom-color: var(--yellow); }
+  .batcol-head .ftip { flex: none; }
+  /* 双列空间紧，行内元素收紧，保证两三字姓名完整可见 */
+  .batcols .brow { gap: 4px; }
+  .batcols .bno { width: 22px; padding: 0; font-size: 10px; }
+  .batcols .posbtn { width: 34px; font-size: 9px; }
+  .batcols .bno.pick { width: 24px; font-size: 10px; }
+  .batcols .brow input { padding: 6px 5px; font-size: 12px; }
+  .brow .posbtn {
+    width: 48px; flex: none; min-height: 32px; padding: 0;
+    font-size: 10px; line-height: 1.15; letter-spacing: 0;
+  }
+  .brow .posbtn.set { border-color: var(--yellow); color: var(--yellow); background: #3a3413; }
+
+  /* ---------- 守备位置选择弹窗 ---------- */
+  #posModal {
+    position: fixed; inset: 0; z-index: 62;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0, 12, 18, .65);
+  }
+  #posModal.on { display: flex; }
+  #posModal .mcard {
+    width: min(88vw, 310px);
+    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
+    padding: 14px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
+  }
+  #posModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+  #posModal .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 10px; }
+  #posModal .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  #posModal .mopt {
+    min-height: 46px; font-size: 13px; border-radius: 10px;
+    background: #123240; color: var(--cyan-l); border: 1.5px solid var(--cyan);
+  }
+  #posModal .mopt:active { background: var(--cyan); color: #06222e; }
+  #posModal .mopt.wide { grid-column: span 3; min-height: 36px; font-size: 12px; }
+  #posModal .mcancel {
+    width: 100%; margin-top: 10px; min-height: 36px; border-radius: 10px;
+    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
+    color: var(--cyan-l); font-size: 13px; opacity: .85;
+  }
+  .batgrid > div { min-width: 0; }
   .batcol-head { font-size: 11px; color: var(--cyan-l); text-align: center; margin-bottom: 5px; letter-spacing: 1px; }
   .batcol-head.cur { color: var(--yellow); font-weight: bold; }
 
   .tip { font-size: 10px; opacity: .5; margin-top: 5px; line-height: 1.5; }
+
+  /* ---------- 年龄段选择页（未选择时全屏覆盖） ---------- */
+  #ageGate {
+    position: fixed; inset: 0; z-index: 99;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px;
+  }
+  #ageGate h2 { font-size: 20px; color: var(--cyan); letter-spacing: 2px; }
+  #ageGate .sub { font-size: 12px; opacity: .6; margin-bottom: 10px; }
+  #ageGate button {
+    width: 100%; max-width: 300px; padding: 16px 0;
+    font-size: 20px; font-weight: bold; border-radius: 12px; cursor: pointer;
+    background: #123240; color: var(--cyan-l); border: 2px solid var(--cyan);
+  }
+  #ageGate button:active { background: var(--cyan); color: #06222e; }
+
+  /* ---------- 安打 / 失误 选择弹窗 ---------- */
+  #playModal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0, 12, 18, .65);
+  }
+  #playModal.on { display: flex; }
+  #playModal .mcard {
+    width: min(86vw, 300px);
+    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
+    padding: 14px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
+  }
+  #playModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+  #playModal .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 10px; }
+  #playModal .mgrid { display: grid; gap: 8px; }
+  #playModal.hit .mgrid { grid-template-columns: 1fr 1fr; }
+  #playModal.err .mgrid { grid-template-columns: repeat(3, 1fr); }
+  #playModal .mopt {
+    min-height: 50px; font-size: 15px; border-radius: 10px;
+    background: #123240; color: var(--cyan-l); border: 1.5px solid var(--cyan);
+  }
+  #playModal .mopt.primary { background: #155e6e; }
+  #playModal .mopt:active { background: var(--cyan); color: #06222e; }
+  #playModal .mcancel {
+    width: 100%; margin-top: 10px; min-height: 36px; border-radius: 10px;
+    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
+    color: var(--cyan-l); font-size: 13px; opacity: .85;
+  }
+
+  /* ---------- 队员选择弹窗（点棒次选人，支持拼音首字母搜索） ---------- */
+  #pickModal {
+    position: fixed; inset: 0; z-index: 65;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0, 12, 18, .65);
+  }
+  #pickModal.on { display: flex; }
+  #pickModal .mcard {
+    width: min(88vw, 320px); max-height: 84vh;
+    display: flex; flex-direction: column;
+    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
+    padding: 12px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
+  }
+  #pickModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+  #pickModal .msub { text-align: center; font-size: 10px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; }
+  #pickModal .pkSearch { margin-bottom: 7px; font-size: 12px; }
+  #pickModal .pkList { overflow-y: auto; max-height: 48vh; display: flex; flex-direction: column; gap: 5px; }
+  #pickModal .pkopt {
+    text-align: left; padding: 8px 10px; min-height: 38px; font-size: 14px;
+    background: #123240; color: var(--cyan-l);
+    border: 1px solid rgba(47, 212, 232, .4); border-radius: 8px;
+  }
+  #pickModal .pkopt:active { background: var(--cyan); color: #06222e; }
+  #pickModal .pkno {
+    display: inline-block; min-width: 22px; text-align: center; margin-right: 6px;
+    background: rgba(255, 210, 77, .15); border: 1px solid rgba(255, 210, 77, .4);
+    color: var(--yellow); border-radius: 6px; font-size: 11px; padding: 1px 4px;
+  }
+  #pickModal .pkopt:active .pkno { color: #06222e; border-color: #06222e; background: transparent; }
+  #pickModal .pkEmpty { text-align: center; font-size: 11px; opacity: .5; padding: 10px 0; }
+  #pickModal .mcancel {
+    width: 100%; margin-top: 8px; min-height: 36px; border-radius: 10px;
+    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
+    color: var(--cyan-l); font-size: 13px; opacity: .85;
+  }
+
+  /* ---------- 队伍库管理弹窗（提前录入球队+队员） ---------- */
+  #teamModal {
+    position: fixed; inset: 0; z-index: 70;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0, 12, 18, .65);
+  }
+  #teamModal.on { display: flex; }
+  #teamModal .tcard {
+    width: min(92vw, 360px); max-height: 86vh;
+    display: flex; flex-direction: column; overflow-y: auto;
+    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
+    padding: 12px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
+  }
+  #teamModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
+  #teamModal .msub { text-align: center; font-size: 10px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; }
+  #teamModal .tlist { max-height: 28vh; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+  #teamModal .trow { display: flex; align-items: center; gap: 5px; }
+  #teamModal .tname {
+    flex: 1; text-align: left; padding: 8px 10px; min-height: 36px; font-size: 13px;
+    background: #123240; color: var(--cyan-l);
+    border: 1px solid rgba(47, 212, 232, .4); border-radius: 8px;
+  }
+  #teamModal .trow .mini { width: 44px; flex: none; }
+  #teamModal .tmEmpty { text-align: center; font-size: 11px; opacity: .5; padding: 8px 0; }
+  /* 批量操作栏 */
+  #teamModal .tbulk { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #teamModal .tcheckall { font-size: 11px; color: var(--cyan-l); display: flex; align-items: center; gap: 4px; flex: 1; cursor: pointer; }
+  #teamModal .tbulk .mini { min-height: 28px; font-size: 11px; padding: 0 10px; }
+  #teamModal .trow input[type=checkbox] { flex: none; width: 15px; height: 15px; accent-color: var(--cyan); }
+  /* 花名册（点队名展开） */
+  #teamModal .troster {
+    margin: 2px 0 6px 20px; border-left: 2px solid rgba(127, 231, 247, .25);
+    padding: 2px 0 2px 8px; display: flex; flex-direction: column; gap: 2px;
+  }
+  #teamModal .tmem { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 6px; border-radius: 6px; background: rgba(12, 28, 34, .6); }
+  #teamModal .tmem .tseq { width: 16px; text-align: right; font-size: 10px; opacity: .4; flex: none; }
+  #teamModal .tmem .tno {
+    min-width: 24px; text-align: center; flex: none; font-size: 11px;
+    color: var(--yellow); background: rgba(255, 210, 77, .12);
+    border: 1px solid rgba(255, 210, 77, .3); border-radius: 5px; padding: 0 3px;
+  }
+  #teamModal textarea {
+    width: 100%; height: 92px; font-family: inherit; font-size: 12px; color: #fff;
+    background: #0c1c22; border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 8px; outline: none; resize: vertical;
+  }
+  #teamModal textarea:focus { border-color: var(--yellow); }
+  #teamModal .mcancel {
+    width: 100%; margin-top: 8px; min-height: 36px; border-radius: 10px;
+    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
+    color: var(--cyan-l); font-size: 13px; opacity: .85;
+  }
+  /* 批量导入区 */
+  #teamModal .importbox {
+    margin-top: 10px; border-top: 1px dashed rgba(127, 231, 247, .3); padding-top: 8px;
+  }
+  #teamModal .imptitle { font-size: 11px; color: var(--cyan-l); margin-bottom: 5px; opacity: .9; }
+  #teamModal #tmImport { height: 74px; font-size: 11px; }
+  #teamModal .improw { display: flex; gap: 6px; margin-top: 6px; }
+  #teamModal .improw .primary { flex: 1; min-height: 34px; font-size: 12px; }
+  #teamModal .improw .mini { flex: 1; min-height: 34px; font-size: 11px; }
+  #teamModal .imptip { font-size: 10px; opacity: .5; margin-top: 5px; }
+
+  /* 打序行里的“从队伍库选人”小按钮 */
+  .bno.pick { color: var(--cyan-l); background: #123240; font-size: 11px; }
 </style>
 </head>
 <body>
+
+<!-- 年龄段选择页：未选择时全屏覆盖，选完进入控制端 -->
+<div id="ageGate" style="display:none">
+  <h2>⚾ 选择比赛年龄段</h2>
+  <div class="sub">U8 / U10 的挂件不显示 E 列和好/坏球</div>
+  <button data-age="U8">U8</button>
+  <button data-age="U10">U10</button>
+  <button data-age="U12">U12</button>
+  <button data-age="other">其他</button>
+</div>
+
+<!-- 安打 / 失误 选择弹窗 -->
+<div id="playModal">
+  <div class="mcard">
+    <div class="mtitle" id="pmTitle">安打</div>
+    <div class="msub" id="pmSub"></div>
+    <div class="mgrid" id="pmGrid"></div>
+    <button class="mcancel" id="pmCancel">取消</button>
+  </div>
+</div>
+
+<!-- 队员选择弹窗：点击棒次的“选”按钮，从队伍库选人 -->
+<div id="pickModal">
+  <div class="mcard">
+    <div class="mtitle" id="pkTitle">选择队员</div>
+    <div class="msub" id="pkSub">已被其他棒次选中的队员不再出现</div>
+    <input type="text" id="pkSearch" class="pkSearch" placeholder="搜索：姓名 / 拼音首字母 / 背号">
+    <div class="pkList" id="pkList"></div>
+    <div class="pkEmpty" id="pkEmpty" style="display:none">没有匹配的队员</div>
+    <button class="mcancel" id="pkCancel">取消</button>
+  </div>
+</div>
+
+<!-- 守备位置选择弹窗 -->
+<div id="posModal">
+  <div class="mcard">
+    <div class="mtitle">守备位置</div>
+    <div class="msub" id="posSub"></div>
+    <div class="mgrid" id="posGrid"></div>
+    <button class="mcancel" id="posCancel">取消</button>
+  </div>
+</div>
+
+<!-- 队伍库管理弹窗：提前录入所有球队及队员名单 -->
+<div id="teamModal">
+  <div class="tcard">
+    <div class="mtitle">⚾ 队伍库</div>
+    <div class="msub">提前录入球队与队员；控制端输入队名即可自动匹配选人</div>
+    <div class="tbulk" id="tmBulkBar" style="display:none">
+      <label class="tcheckall"><input type="checkbox" id="tmCheckAll"> 全选</label>
+      <button id="tmDelSel" class="mini warn">删除所选</button>
+      <button id="tmClearAll" class="mini warn">清空全部</button>
+    </div>
+    <div class="tlist" id="tmList"></div>
+    <div class="field"><label>球队名称</label><input type="text" id="tmName" placeholder="如：雄鹰队"></div>
+    <div class="field" style="margin-top:6px"><label>组别（选填；填 U8/U10/U12 时匹配后自动设置年龄段）</label>
+      <input type="text" id="tmGroup" list="groupOpts" placeholder="如：U10 或 A组">
+      <datalist id="groupOpts"><option>U8</option><option>U10</option><option>U12</option><option>其他</option></datalist>
+    </div>
+    <div class="field" style="margin-top:6px"><label>队员名单（每行一名，可带背号，最多 40 人）</label>
+      <textarea id="tmPlayers" placeholder="7 张伟&#10;12 王强&#10;刘洋"></textarea>
+    </div>
+    <div class="grid2" style="margin-top:8px">
+      <button id="tmSave" class="primary">保存球队</button>
+      <button id="tmFormClear" class="mini">清空表单</button>
+    </div>
+
+    <!-- 批量导入：从 Excel 复制三列（队名/组别/队员）粘贴，或选择 CSV 文件 -->
+    <div class="importbox">
+      <div class="imptitle">📋 批量导入（四列：队名 / 组别 / 背号 / 队员）</div>
+      <textarea id="tmImport" placeholder="从 Excel 选中列复制后粘贴到这里：&#10;雄鹰队&#9;U10&#9;7&#9;张伟&#10;雄鹰队&#9;U10&#9;12&#9;王强&#10;闪电队&#9;&#9;3&#9;刘洋&#10;&#10;也支持三列（队名/组别/队员）或两列（队名/队员）"></textarea>
+      <div class="improw">
+        <button id="tmImportGo" class="primary">解析并导入</button>
+        <button id="tmImportFile" class="mini">选择表格文件</button>
+        <button id="tmTpl" class="mini">下载模板</button>
+      </div>
+      <div class="imptip">支持 Excel（.xlsx/.xls）和 CSV 文件；Excel 另存为 CSV 也可以</div>
+      <input type="file" id="tmFile" accept=".xlsx,.xls,.csv,.txt,.tsv" style="display:none">
+    </div>
+
+    <button class="mcancel" id="tmClose">关闭</button>
+  </div>
+</div>
 
 <div class="layout">
 
@@ -147,25 +436,64 @@
     <div class="conn bad" id="conn"><span class="dotlive"></span><span id="connText">连接中</span></div>
   </div>
 
-  <!-- 左列：局数 -->
+  <!-- 局数横条（全宽） -->
+  <div class="card full innbar">
+    <span class="h3t">局数</span>
+    <button id="prevInn" class="mini sq" title="上一半局">◀</button>
+    <div class="innbox" id="innNow">1局上</div>
+    <button id="nextInn" class="mini sq" title="下一半局">▶</button>
+    <button id="toggleHalf" class="mini">换上/下</button>
+    <button id="addInn" class="mini sq" title="增加一局（延长赛）">+局</button>
+    <button id="autoSwitch" class="mini">自动:开</button>
+  </div>
+
+  <!-- 左列：得分录入 + 比赛信息 -->
+  <div class="stack">
+
   <div class="card">
-    <div class="h3row"><span class="h3t">局数</span></div>
-    <div class="line">
-      <button id="prevInn" class="mini" style="flex:1" title="上一半局">◀</button>
-      <div class="innbox" id="innNow">1局上</div>
-      <button id="nextInn" class="mini primary" style="flex:1" title="下一半局">▶</button>
+    <div class="h3row">
+      <span class="h3t">得分录入</span>
+      <span class="ftip" id="scoreTip">客队 第1局 0</span>
     </div>
-    <div class="line" style="margin-top:6px">
-      <button id="toggleHalf" class="mini" style="flex:1">换上/下</button>
-      <button id="autoSwitch" class="mini" style="flex:1">满3出局:开</button>
+    <div class="line">
+      <button id="teamAway" class="mini" style="flex:1">客队</button>
+      <button id="teamHome" class="mini" style="flex:1">主队</button>
+      <button id="scoreClear" class="mini" style="width:44px">清零</button>
+    </div>
+    <div class="chips flexchips" id="inningChips" style="margin-top:5px"></div>
+    <div class="line" style="margin-top:5px;justify-content:center">
+      <button data-score="-1" class="sq-lg">−</button>
+      <div class="val" id="scoreVal">0</div>
+      <button data-score="1" class="sq-lg primary">＋</button>
     </div>
   </div>
 
-  <!-- 右列：球数计数 + 垒包 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">比赛信息</span>
+      <span class="ftip">显示在挂件右上角</span>
+    </div>
+    <div class="field"><label>比赛名称（空则不显示）</label><input type="text" id="matchName" placeholder="如：XX杯棒球邀请赛"></div>
+    <div class="field" style="margin-top:5px"><label>主办方 Logo（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="orgLogoBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="orgLogoPrev" style="display:none" alt="">
+        <button class="mini" id="orgLogoClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="orgLogoFile" accept="image/*" hidden>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- 右列：球数计数 + 场上操作 -->
+  <div class="stack">
+
   <div class="card">
     <div class="h3row">
       <span class="h3t">球数计数</span>
-      <button id="resetCount" class="mini" style="margin-left:auto;width:44px">清零</button>
+      <button id="btnUndo" class="mini" style="margin-left:auto;width:46px" title="撤销上一次操作">↶ 撤销</button>
+      <button id="resetCount" class="mini" style="width:44px">清零</button>
     </div>
     <div class="crow">
       <span class="ctag">B</span>
@@ -190,9 +518,9 @@
       <button class="basebtn" id="base1">二垒</button>
       <button class="basebtn" id="base2">三垒</button>
     </div>
+    <button id="btnFoul" class="mini" style="width:100%;margin-top:5px" title="2 好球后界外不再累计好球数">界外（2好球后不计）</button>
   </div>
 
-  <!-- 左列：安打 / 失误 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">场上操作</span>
@@ -202,40 +530,24 @@
       <button id="btnHit" class="primary">安打 +1</button>
       <button id="btnError">失误 +1</button>
     </div>
+    <button id="btnHeClear" class="mini" style="width:100%;margin-top:5px">清除 H / E</button>
   </div>
 
-  <!-- 右列：得分录入 -->
-  <div class="card">
-    <div class="h3row">
-      <span class="h3t">得分录入</span>
-      <span class="ftip" id="scoreTip">客队 第1局 0</span>
-    </div>
-    <div class="line">
-      <button id="teamAway" class="mini" style="flex:1">客队</button>
-      <button id="teamHome" class="mini" style="flex:1">主队</button>
-      <button id="scoreClear" class="mini" style="width:44px">清零</button>
-    </div>
-    <div class="chips flexchips" id="inningChips" style="margin-top:5px"></div>
-    <div class="line" style="margin-top:5px;justify-content:center">
-      <button data-score="-1" class="sq-lg">−</button>
-      <div class="val" id="scoreVal">0</div>
-      <button data-score="1" class="sq-lg primary">＋</button>
-    </div>
   </div>
 
-  <!-- 打序（全宽，左列客队、右列主队） -->
   <div class="card full">
     <div class="h3row">
       <span class="h3t">打序</span>
       <span class="ftip" id="batterNow">第1棒 —</span>
     </div>
-    <div class="batgrid">
-      <div>
-        <div class="batcol-head" id="batHeadAway">客队</div>
+    <div class="tip" id="teamMatchTip" style="display:none"></div>
+    <div class="batcols">
+      <div class="batcol">
+        <div class="batcol-head" id="batHeadAway"><span id="batNameAway">客队</span><span class="ftip" id="batStateAway"></span></div>
         <div id="batterListAway"></div>
       </div>
-      <div>
-        <div class="batcol-head" id="batHeadHome">主队</div>
+      <div class="batcol">
+        <div class="batcol-head" id="batHeadHome"><span id="batNameHome">主队</span><span class="ftip" id="batStateHome"></span></div>
         <div id="batterListHome"></div>
       </div>
     </div>
@@ -249,7 +561,9 @@
     </div>
   </div>
 
-  <!-- 左列：队名/投手 -->
+  <!-- 底部左：队名 / 投手 -->
+  <div class="stack">
+
   <div class="card">
     <div class="h3row">
       <span class="h3t">队名 / 投手</span>
@@ -257,12 +571,44 @@
     </div>
     <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
     <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
-    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label><input type="text" id="pitcher" placeholder="未设置"></div>
+    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label>
+      <div class="line">
+        <input type="text" id="pitcher" placeholder="未设置" style="flex:1;min-width:0">
+        <button class="mini" id="btnPickPitcher" style="width:44px;flex:none">选</button>
+      </div>
+    </div>
+    <div class="field" style="margin-top:5px"><label>客队徽（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="logoAwayBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="logoAwayPrev" style="display:none" alt="">
+        <button class="mini" id="logoAwayClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="logoAwayFile" accept="image/*" hidden>
+    </div>
+    <div class="field" style="margin-top:5px"><label>主队徽（空则不显示）</label>
+      <div class="line">
+        <button class="mini" id="logoHomeBtn" style="width:52px">上传</button>
+        <img class="logoPrev" id="logoHomePrev" style="display:none" alt="">
+        <button class="mini" id="logoHomeClear" style="display:none;width:46px">清除</button>
+      </div>
+      <input type="file" id="logoHomeFile" accept="image/*" hidden>
+    </div>
   </div>
 
-  <!-- 右列：扫码/更多 -->
+  </div>
+
+  <!-- 底部右：扫码 / 更多 -->
+  <div class="stack">
+
   <div class="card">
     <div class="h3row"><span class="h3t">扫码 / 更多</span></div>
+    <div class="line" style="margin-bottom:6px">
+      <span style="font-size:10px;color:var(--cyan-l);flex:none;white-space:nowrap">年龄</span>
+      <button class="mini ageChip" data-age="U8" style="flex:1">U8</button>
+      <button class="mini ageChip" data-age="U10" style="flex:1">U10</button>
+      <button class="mini ageChip" data-age="U12" style="flex:1">U12</button>
+      <button class="mini ageChip" data-age="other" style="flex:1">其他</button>
+    </div>
     <div id="qrBlock" style="display:none">
       <div id="qrBox" style="text-align:center"></div>
       <div class="line" style="margin-top:6px">
@@ -270,11 +616,17 @@
         <button id="copyUrl" class="mini" style="width:46px">复制</button>
       </div>
     </div>
+    <button id="btnTeamLib" style="width:100%;margin-top:6px">队伍库 · 录入球队队员</button>
+    <button id="btnExport" class="primary" style="width:100%;margin-top:6px">结束比赛 · 导出数据表</button>
     <button id="resetAll" class="warn" style="width:100%;margin-top:6px">清空比赛数据</button>
   </div>
 
-</div>
+  </div>
 
+</div>
+<script src="/qrcode.min.js"></script>
+<script src="/qrhelper.js"></script>
+<script src="/pinyin-db.js"></script>
 <script src="/core.js"></script>
 <script>
 let curTeam = 1;     // 0=主队 1=客队（默认客队，先攻）
@@ -292,6 +644,13 @@ function renderPreview(s) {
   const inn = `${s.inning}局${s.half === 0 ? '上' : '下'}`;
   $('pvInn').textContent = inn;
   $('innNow').textContent = inn;
+  // 局数已达上限时禁用「+局」
+  $('addInn').disabled = s.innings >= Sync.MAX_INNINGS;
+  // 最后一局打完仍平局 → 提示可加局
+  const totalR = (row) => row.reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+  if (s.inning >= s.innings && s.half === 1 && totalR(s.scores[0]) === totalR(s.scores[1])) {
+    $('innNow').textContent = inn + ' · 平局可+局';
+  }
 }
 
 /* ---------- 圆点 ---------- */
@@ -331,13 +690,22 @@ function bindInput(el, handler) {
 }
 function setInput(el, value) { if (document.activeElement !== el) el.value = value; }
 
-/* ---------- 打序列表（客队/主队两列） ---------- */
-let batterRows = [[], []];   // [主队列, 客队列]
+/* ---------- 打序列表（双列，客队/主队同时显示） ---------- */
+const batterRows = [[], []];  // 两队的行 [主队, 客队]
+const batBuiltLen = [-1, -1]; // 两队各自已构建的棒数
+let matchedPlayers = [null, null];   // [主队, 客队]：队名在队伍库中匹配到的队员名单
 
-function buildBatterColumn(containerId, teamIdx, list) {
-  const box = $(containerId);
+/** 守备位置缩写（按钮上显示） */
+const POS_ABBR = {
+  1: '投手', 2: '捕手', 3: '一垒', 4: '二垒', 5: '三垒',
+  6: '游击', 7: '左外', 8: '中外', 9: '右外', DH: '指定'
+};
+
+function buildBatterList(teamIdx, list) {
+  const box = $(teamIdx === 1 ? 'batterListAway' : 'batterListHome');
   box.innerHTML = '';
   batterRows[teamIdx] = [];
+  batBuiltLen[teamIdx] = list.length;
   list.forEach((name, i) => {
     const row = document.createElement('div');
     row.className = 'brow';
@@ -353,37 +721,59 @@ function buildBatterColumn(containerId, teamIdx, list) {
     inp.placeholder = `第${i + 1}棒`;
     bindInput(inp, (v) => Sync.setBatterName(teamIdx, i, v));
 
-    row.append(no, inp);
+    const posBtn = document.createElement('button');
+    posBtn.className = 'posbtn';
+    posBtn.title = '设置该棒守备位置';
+    posBtn.addEventListener('click', () => openPosModal(teamIdx, i));
+
+    const pick = document.createElement('button');
+    pick.className = 'bno pick';
+    pick.textContent = '选';
+    pick.title = '从队伍库选择队员';
+    pick.style.display = 'none';
+    pick.addEventListener('click', () => openPickModal(teamIdx, i));
+
+    row.append(no, inp, posBtn, pick);
     box.appendChild(row);
-    batterRows[teamIdx].push({ no, inp });
+    batterRows[teamIdx].push({ no, inp, posBtn, pick });
   });
 }
 
 function renderBatters(s) {
-  // 棒数变化时才重建 DOM，避免打字时丢焦点
-  if ($('batterListHome').children.length !== s.batters[0].length) {
-    buildBatterColumn('batterListAway', 1, s.batters[1]);   // 左列：客队
-    buildBatterColumn('batterListHome', 0, s.batters[0]);   // 右列：主队
-  }
+  const atk = s.half === 0 ? 1 : 0;
 
-  [0, 1].forEach((teamIdx) => {
-    s.batters[teamIdx].forEach((name, i) => {
-      const row = batterRows[teamIdx][i];
+  // 棒数变化时才重建该队 DOM，避免打字时丢焦点
+  [1, 0].forEach((t) => {
+    if (batBuiltLen[t] !== s.batters[t].length) buildBatterList(t, s.batters[t]);
+  });
+  refreshTeamMatch();
+  updatePickButtons();
+
+  [1, 0].forEach((t) => {
+    const posList = (s.positions && s.positions[t]) || [];
+    s.batters[t].forEach((name, i) => {
+      const row = batterRows[t][i];
       if (!row) return;
-      row.no.classList.toggle('sel', i === s.batterIdx[teamIdx]);
-      row.inp.classList.toggle('cur', i === s.batterIdx[teamIdx]);
+      // 只高亮进攻方的当前打者；防守方那一棒不标黄，避免与当前打者混淆
+      const isCur = t === atk && i === s.batterIdx[t];
+      row.no.classList.toggle('sel', isCur);
+      row.inp.classList.toggle('cur', isCur);
       if (document.activeElement !== row.inp) row.inp.value = name;
+      const pos = String(posList[i] == null ? '' : posList[i]).trim();
+      row.posBtn.textContent = POS_ABBR[pos] || '位置';
+      row.posBtn.classList.toggle('set', !!POS_ABBR[pos]);
     });
   });
 
-  // 标题与列头
-  const atk = s.half === 0 ? 1 : 0;
+  // 当前打者提示与两列列头（进攻方高亮）
   const cur = s.batters[atk][s.batterIdx[atk]] || '—';
   $('batterNow').textContent = `${s.teams[atk]} 第${s.batterIdx[atk] + 1}棒 ${cur}`;
-  $('batHeadAway').textContent = s.teams[1];
-  $('batHeadHome').textContent = s.teams[0];
-  $('batHeadAway').classList.toggle('cur', atk === 1);
-  $('batHeadHome').classList.toggle('cur', atk === 0);
+  $('batNameAway').textContent = s.teams[1] || '客队';
+  $('batNameHome').textContent = s.teams[0] || '主队';
+  $('batStateAway').textContent = atk === 1 ? '进攻中' : '防守中';
+  $('batStateHome').textContent = atk === 0 ? '进攻中' : '防守中';
+  $('batHeadAway').classList.toggle('atk', atk === 1);
+  $('batHeadHome').classList.toggle('atk', atk === 0);
 
   $('addBatter').disabled = s.batters[0].length >= Sync.MAX_BATTERS;
   $('removeBatter').disabled = s.batters[0].length <= 1;
@@ -391,6 +781,7 @@ function renderBatters(s) {
 
 /* ---------- 主渲染 ---------- */
 function render(s) {
+  paintAge(s);
   renderPreview(s);
   paintDots('dotsBalls', s.balls);
   paintDots('dotsStrikes', s.strikes);
@@ -419,6 +810,11 @@ function render(s) {
   setInput($('nameAway'), s.teams[1]);
   setInput($('nameHome'), s.teams[0]);
   setInput($('pitcher'), s.pitcher);
+  paintLogo(1, 'logoAwayPrev', 'logoAwayClear');
+  paintLogo(0, 'logoHomePrev', 'logoHomeClear');
+  setInput($('matchName'), s.matchName || '');
+  if (s.orgLogo) { $('orgLogoPrev').src = s.orgLogo; $('orgLogoPrev').style.display = ''; $('orgLogoClear').style.display = ''; }
+  else { $('orgLogoPrev').style.display = 'none'; $('orgLogoClear').style.display = 'none'; }
   $('playerTip').textContent = s.pitcher ? `投手 ${s.pitcher}` : '投手未设置';
 }
 
@@ -428,6 +824,70 @@ $('nextInn').addEventListener('click', () => Sync.nextHalf());
 $('toggleHalf').addEventListener('click', () => Sync.toggleHalf());
 $('resetCount').addEventListener('click', () => Sync.resetCount());
 $('autoSwitch').addEventListener('click', () => Sync.setAutoAdvance(!Sync.get().autoAdvance));
+
+/* ---------- 界外球 / 撤销 / 延长赛 / 投手选人 ---------- */
+$('btnFoul').addEventListener('click', () => {
+  const counted = Sync.foul();
+  flash(counted ? '界外 · 好球 +1' : '2 好球后界外不再累计');
+});
+$('btnUndo').addEventListener('click', () => {
+  Sync.undo().then((d) => {
+    if (d && d.ok) flash('↶ 已撤销上一步');
+    else flash((d && d.error) || '没有可撤销的操作');
+  });
+});
+$('addInn').addEventListener('click', () => {
+  const s = Sync.get();
+  if (s.innings >= Sync.MAX_INNINGS) { flash('最多 ' + Sync.MAX_INNINGS + ' 局'); return; }
+  Sync.setInnings(s.innings + 1);
+  flash('局数已设为 ' + (s.innings + 1) + ' 局（延长赛）');
+});
+$('btnPickPitcher').addEventListener('click', () => openPitcherPick());
+
+/* ---------- 守备位置选择弹窗 ---------- */
+const posModal = $('posModal');
+let posTarget = null;   // { team, pos }
+
+function closePosModal() { posModal.classList.remove('on'); }
+
+function openPosModal(team, pos) {
+  const s = Sync.get();
+  const name = s.batters[team][pos] || ('第' + (pos + 1) + '棒');
+  const cur = String(((s.positions && s.positions[team]) || [])[pos] || '');
+  posTarget = { team, pos };
+  $('posSub').textContent = `${s.teams[team]} · 第${pos + 1}棒 ${name}`;
+  const grid = $('posGrid');
+  grid.innerHTML = '';
+  for (let n = 1; n <= 9; n++) {
+    const b = document.createElement('button');
+    b.className = 'mopt';
+    b.innerHTML = `<b style="font-size:15px">${n}</b> <span style="font-size:10px;opacity:.75">${POS_NAMES[n]}</span>`;
+    if (cur === String(n)) b.style.borderColor = 'var(--yellow)';
+    b.addEventListener('click', () => {
+      Sync.setPosition(team, pos, String(n));
+      closePosModal();
+      flash(`第${pos + 1}棒守备：${POS_NAMES[n]}`);
+    });
+    grid.appendChild(b);
+  }
+  const dh = document.createElement('button');
+  dh.className = 'mopt wide';
+  dh.textContent = '指定打击（DH）';
+  if (cur === 'DH') dh.style.borderColor = 'var(--yellow)';
+  dh.addEventListener('click', () => {
+    Sync.setPosition(team, pos, 'DH'); closePosModal(); flash(`第${pos + 1}棒：指定打击`);
+  });
+  const clr = document.createElement('button');
+  clr.className = 'mopt wide';
+  clr.textContent = '不设守备位置';
+  clr.addEventListener('click', () => {
+    Sync.setPosition(team, pos, ''); closePosModal(); flash(`第${pos + 1}棒守备位置已清空`);
+  });
+  grid.append(dh, clr);
+  posModal.classList.add('on');
+}
+$('posCancel').addEventListener('click', closePosModal);
+posModal.addEventListener('click', (e) => { if (e.target === posModal) closePosModal(); });
 
 /* ---------- B / S / Out ---------- */
 document.querySelectorAll('[data-key]').forEach((btn) => {
@@ -443,8 +903,69 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
 ['base0', 'base1', 'base2'].forEach((id, i) => {
   $(id).addEventListener('click', () => Sync.toggleBase(i));
 });
-$('btnHit').addEventListener('click', () => Sync.hit());
-$('btnError').addEventListener('click', () => Sync.error());
+/* ---------- 安打 / 失误：点击弹出选择窗口 ---------- */
+const HIT_OPTS = [
+  ['1B', '一垒安打'],
+  ['2B', '二垒安打'],
+  ['3B', '三垒安打'],
+  ['HR', '全垒打']
+];
+const POS_NAMES = { 1: '投手', 2: '捕手', 3: '一垒手', 4: '二垒手', 5: '三垒手', 6: '游击手', 7: '左外野', 8: '中外野', 9: '右外野' };
+const playModal = $('playModal');
+const pmGrid = $('pmGrid');
+
+function closePlayModal() { playModal.classList.remove('on'); }
+
+function openPlayModal(mode) {
+  const s = Sync.get();
+  const atk = Sync.attackingTeam();
+  const def = Sync.defendingTeam();
+  const idx = s.batterIdx[atk];
+  const batter = s.batters[atk][idx] || ('第' + (idx + 1) + '棒');
+
+  playModal.classList.toggle('hit', mode === 'hit');
+  playModal.classList.toggle('err', mode === 'err');
+  pmGrid.innerHTML = '';
+
+  if (mode === 'hit') {
+    $('pmTitle').textContent = '⚾ 选择安打类型';
+    $('pmSub').textContent = `${s.teams[atk]} 进攻 · 当前打者：${batter}`;
+    HIT_OPTS.forEach(([k, label], i) => {
+      const b = document.createElement('button');
+      b.className = 'mopt' + (i === 0 ? ' primary' : '');
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        Sync.hitWith(k);
+        closePlayModal();
+        flash(label + (label === '全垒打' ? '！得分' : ' +1'));
+      });
+      pmGrid.appendChild(b);
+    });
+  } else {
+    $('pmTitle').textContent = '⚠️ 选择失误位置';
+    $('pmSub').textContent = `${s.teams[def]} 防守 · 记入该队 E`;
+    for (let n = 1; n <= 9; n++) {
+      const b = document.createElement('button');
+      b.className = 'mopt';
+      b.innerHTML = '<b style="font-size:19px">' + n + '</b><br><span style="font-size:10px;opacity:.75">' + POS_NAMES[n] + '</span>';
+      b.addEventListener('click', () => {
+        Sync.errorWith(n);
+        closePlayModal();
+        flash('失误 E' + n + ' +1');
+      });
+      pmGrid.appendChild(b);
+    }
+  }
+  playModal.classList.add('on');
+}
+
+$('btnHit').addEventListener('click', () => openPlayModal('hit'));
+$('btnError').addEventListener('click', () => openPlayModal('error'));
+$('pmCancel').addEventListener('click', closePlayModal);
+playModal.addEventListener('click', (e) => { if (e.target === playModal) closePlayModal(); });
+$('btnHeClear').addEventListener('click', () => {
+  if (confirm('确定清除两队的 H / E 计数？')) Sync.clearHE();
+});
 
 /* ---------- 得分录入 ---------- */
 $('teamAway').addEventListener('click', () => { curTeam = 1; render(Sync.get()); });
@@ -460,39 +981,576 @@ $('nextBatterBtn').addEventListener('click', () => Sync.nextBatter());
 $('addBatter').addEventListener('click', () => Sync.addBatterSlot());
 $('removeBatter').addEventListener('click', () => Sync.removeLastBatter());
 
-/* ---------- 队名 / 投手 ---------- */
-bindInput($('nameHome'), (v) => Sync.setTeamName(0, v));
-bindInput($('nameAway'), (v) => Sync.setTeamName(1, v));
+/* ---------- 队伍库：队名匹配 + 棒次选人 + 拼音首字母搜索 ---------- */
+const AGE_GROUPS = ['U8', 'U10', 'U12', '其他'];
+
+/** 队名（trim 后）在队伍库中精确匹配则返回队员名单，否则 null */
+function refreshTeamMatch() {
+  const s = Sync.get();
+  matchedPlayers[0] = TeamLib.find(s.teams[0]);
+  matchedPlayers[1] = TeamLib.find(s.teams[1]);
+  // 匹配到的队若在库里登记了组别（U8/U10/U12/其他），自动设置为比赛年龄段
+  [0, 1].forEach((t) => {
+    const team = TeamLib.findTeam(s.teams[t]);
+    if (team && team.group && AGE_GROUPS.indexOf(team.group) >= 0 && (s.ageGroup || '') !== team.group) {
+      Sync.setAgeGroup(team.group);
+    }
+  });
+}
+
+/** 匹配到队伍库的队：该队打序行显示“选”按钮 + 顶部提示 */
+function updatePickButtons() {
+  const s = Sync.get();
+  const tips = [];
+  [1, 0].forEach((t) => {
+    const ok = !!matchedPlayers[t];
+    batterRows[t].forEach((r) => { r.pick.style.display = ok ? '' : 'none'; });
+    if (!matchedPlayers[t]) return;
+    const team = TeamLib.findTeam(s.teams[t]);
+    const gtxt = team && team.group ? team.group + ' · ' : '';
+    tips.push(`${s.teams[t]}${t === 1 ? '（客）' : '（主）'}已匹配 · ${gtxt}${matchedPlayers[t].length} 人，点「选」填棒次`);
+  });
+  const tip = $('teamMatchTip');
+  if (tips.length) { tip.textContent = '✔ ' + tips.join('；'); tip.style.display = ''; }
+  else { tip.style.display = 'none'; }
+}
+
+/** 搜索过滤：中文按姓名包含；字母按拼音首字母（多音字组合）；数字按背号匹配 */
+function filterPlayers(list, q) {
+  q = String(q || '').trim();
+  if (!q) return list;
+  const hasChinese = /[\u4e00-\u9fa5]/.test(q);
+  const isDigits = /^\d+$/.test(q);
+  const lower = q.toLowerCase();
+  return list.filter((p) => {
+    const pl = TeamLib.normPlayer(p);
+    const label = TeamLib.playerLabel(pl);
+    if (isDigits) return pl.no === q;                                   // 背号精确匹配
+    if (hasChinese) return pl.name.indexOf(q) >= 0 || label.indexOf(q) >= 0;
+    if (label.toLowerCase().indexOf(lower) >= 0) return true;
+    if (window.PY && window.PY.matchInitials) return !!PY.matchInitials(pl.name, q);
+    return false;
+  });
+}
+
+/* ---- 选人弹窗（棒次选人 / 投手选人） ---- */
+const pickModal = $('pickModal');
+let pickTarget = null;   // { mode:'batter', team, pos } 或 { mode:'pitcher' }
+
+function closePickModal() { pickModal.classList.remove('on'); }
+
+/** 投手候选：优先两队队伍库名单，缺失时退回两队打序名字（去重） */
+function pitcherCandidates() {
+  const s = Sync.get();
+  const out = [];
+  const seen = new Set();
+  [1, 0].forEach((t) => {
+    const teamName = String(s.teams[t] || '').trim();
+    const lib = matchedPlayers[t] || TeamLib.find(teamName);
+    const src = (lib && lib.length) ? lib : s.batters[t];
+    src.forEach((p) => {
+      const pl = TeamLib.normPlayer(p);
+      const label = TeamLib.playerLabel(pl);
+      if (!label || seen.has(label)) return;
+      seen.add(label);
+      out.push(label);
+    });
+  });
+  return out;
+}
+
+function openPickModal(team, pos) {
+  const s = Sync.get();
+  const teamName = String(s.teams[team] || '').trim();
+  const players = matchedPlayers[team] || TeamLib.find(teamName);
+  if (!players) {
+    flash('“' + (teamName || '该队') + '”不在队伍库，请先在「队伍库」录入');
+    return;
+  }
+  pickTarget = { mode: 'batter', team, pos };
+  $('pkTitle').textContent = `⚾ ${teamName} · 第${pos + 1}棒`;
+  $('pkSub').textContent = '已被其他棒次选中的队员不再出现';
+  $('pkSearch').value = '';
+  renderPickList('');
+  pickModal.classList.add('on');
+  setTimeout(() => { if (pickModal.classList.contains('on')) $('pkSearch').focus(); }, 80);
+}
+
+function openPitcherPick() {
+  pickTarget = { mode: 'pitcher' };
+  const s = Sync.get();
+  $('pkTitle').textContent = '⚾ 选择投手';
+  $('pkSub').textContent = `${s.teams[s.half === 0 ? 0 : 1]} 防守 · 从两队名单选择`;
+  $('pkSearch').value = '';
+  renderPickList('');
+  pickModal.classList.add('on');
+  setTimeout(() => { if (pickModal.classList.contains('on')) $('pkSearch').focus(); }, 80);
+}
+
+function renderPickList(q) {
+  if (!pickTarget) return;
+  const s = Sync.get();
+  let list = [];
+  let emptyHint = '没有匹配的队员';
+
+  if (pickTarget.mode === 'pitcher') {
+    list = filterPlayers(pitcherCandidates(), q);
+    emptyHint = '两队名单为空，请先填打序或队伍库';
+  } else {
+    const { team, pos } = pickTarget;
+    const used = new Set(s.batters[team].map((n) => String(n || '').trim()).filter(Boolean));
+    const all = matchedPlayers[team] || [];
+    list = filterPlayers(all.filter((p) => !used.has(TeamLib.playerLabel(p))), q);
+    emptyHint = all.length && q ? '没有匹配「' + q + '」的队员' : '该队队员都已被安排棒次';
+  }
+
+  const box = $('pkList');
+  box.innerHTML = '';
+  $('pkEmpty').style.display = list.length ? 'none' : '';
+  if (!list.length) $('pkEmpty').textContent = emptyHint;
+
+  list.forEach((p) => {
+    const pl = TeamLib.normPlayer(p);
+    const label = TeamLib.playerLabel(pl);
+    const b = document.createElement('button');
+    b.className = 'pkopt';
+    if (pl.no) {
+      const badge = document.createElement('span');
+      badge.className = 'pkno';
+      badge.textContent = pl.no;
+      b.appendChild(badge);
+    }
+    b.appendChild(document.createTextNode(pl.name));
+    b.addEventListener('click', () => {
+      if (pickTarget.mode === 'pitcher') {
+        Sync.setPitcher(label);
+        closePickModal();
+        flash('投手：' + label);
+      } else {
+        const { team, pos } = pickTarget;
+        Sync.setBatterName(team, pos, label);
+        closePickModal();
+        flash('第' + (pos + 1) + '棒：' + label);
+      }
+    });
+    box.appendChild(b);
+  });
+}
+
+bindInput($('pkSearch'), (v) => renderPickList(v));
+$('pkCancel').addEventListener('click', closePickModal);
+pickModal.addEventListener('click', (e) => { if (e.target === pickModal) closePickModal(); });
+
+/* ---- 队伍库管理弹窗 ---- */
+const teamModal = $('teamModal');
+
+function renderTeamList() {
+  const box = $('tmList');
+  box.innerHTML = '';
+  $('tmCheckAll').checked = false;
+  const names = Object.keys(TeamLib.teams).sort();
+  $('tmBulkBar').style.display = names.length ? '' : 'none';
+  if (!names.length) {
+    const d = document.createElement('div');
+    d.className = 'tmEmpty';
+    d.textContent = '还没有录入球队，在下方填写后保存';
+    box.appendChild(d);
+    return;
+  }
+  names.forEach((name) => {
+    const team = TeamLib.findTeam(name) || { group: '', players: [] };
+    const wrap = document.createElement('div');
+    const row = document.createElement('div');
+    row.className = 'trow';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'tmchk';
+    chk.setAttribute('data-name', name);
+    const btn = document.createElement('button');
+    btn.className = 'tname';
+    btn.textContent = name + (team.group ? '［' + team.group + '］' : '') + '（' + team.players.length + '人）';
+    btn.title = '点击展开/收起该队队员名单';
+    // 队员花名册（点击队名展开）
+    const roster = document.createElement('div');
+    roster.className = 'troster';
+    roster.style.display = 'none';
+    team.players.forEach((p, i) => {
+      const pl = TeamLib.normPlayer(p);
+      const item = document.createElement('div');
+      item.className = 'tmem';
+      const no = document.createElement('span');
+      no.className = 'tno';
+      no.textContent = pl.no || '—';
+      const nm = document.createElement('span');
+      nm.textContent = pl.name;
+      const seq = document.createElement('span');
+      seq.className = 'tseq';
+      seq.textContent = i + 1;
+      item.append(seq, no, nm);
+      roster.appendChild(item);
+    });
+    btn.addEventListener('click', () => {
+      roster.style.display = roster.style.display === 'none' ? '' : 'none';
+    });
+    const edit = document.createElement('button');
+    edit.className = 'mini';
+    edit.textContent = '编辑';
+    edit.title = '载入到下方表单编辑';
+    edit.addEventListener('click', () => {
+      $('tmName').value = name;
+      $('tmGroup').value = team.group || '';
+      $('tmPlayers').value = team.players.map((p) => TeamLib.playerLabel(p)).join('\n');
+    });
+    const del = document.createElement('button');
+    del.className = 'mini warn';
+    del.textContent = '删除';
+    del.addEventListener('click', () => {
+      if (!confirm('删除球队「' + name + '」？（不影响已填好的打序）')) return;
+      TeamLib.remove(name).then(() => {
+        renderTeamList();
+        refreshTeamMatch();
+        updatePickButtons();
+      });
+    });
+    row.append(chk, btn, edit, del);
+    wrap.append(row, roster);
+    box.appendChild(wrap);
+  });
+}
+
+/** 当前勾选的球队名列表 */
+function checkedTeams() {
+  return Array.from(document.querySelectorAll('.tmchk:checked')).map((c) => c.getAttribute('data-name'));
+}
+
+$('tmCheckAll').addEventListener('change', () => {
+  const on = $('tmCheckAll').checked;
+  document.querySelectorAll('.tmchk').forEach((c) => { c.checked = on; });
+});
+
+$('tmDelSel').addEventListener('click', () => {
+  const names = checkedTeams();
+  if (!names.length) { flash('请先勾选要删除的球队'); return; }
+  if (!confirm(`删除所选 ${names.length} 支球队？\n${names.join('、')}\n（不影响已填好的打序）`)) return;
+  TeamLib.remove(names).then(() => {
+    renderTeamList();
+    refreshTeamMatch();
+    updatePickButtons();
+    flash(`已删除 ${names.length} 支球队`);
+  });
+});
+
+$('tmClearAll').addEventListener('click', () => {
+  const total = Object.keys(TeamLib.teams).length;
+  if (!total) return;
+  if (!confirm(`清空整个队伍库（共 ${total} 支球队）？此操作不可恢复！`)) return;
+  if (!confirm('再次确认：真的要清空全部球队吗？建议先在后台总览页下载队伍库备份。')) return;
+  TeamLib.clearAll().then(() => {
+    renderTeamList();
+    refreshTeamMatch();
+    updatePickButtons();
+    flash('队伍库已清空');
+  });
+});
+
+$('btnTeamLib').addEventListener('click', () => {
+  TeamLib.load().then(() => {
+    renderTeamList();
+    refreshTeamMatch();
+    updatePickButtons();
+  });
+  teamModal.classList.add('on');
+});
+$('tmClose').addEventListener('click', () => teamModal.classList.remove('on'));
+teamModal.addEventListener('click', (e) => { if (e.target === teamModal) teamModal.classList.remove('on'); });
+$('tmFormClear').addEventListener('click', () => { $('tmName').value = ''; $('tmGroup').value = ''; $('tmPlayers').value = ''; });
+
+$('tmSave').addEventListener('click', () => {
+  const name = $('tmName').value.trim();
+  const group = $('tmGroup').value.trim();
+  const players = $('tmPlayers').value.split(/\r?\n/)
+    .map((s) => TeamLib.normPlayer(s))                 // 支持「7 张伟」「7号 张伟」自动拆背号
+    .filter((p) => p && p.name).slice(0, 40);
+  if (!name) { alert('请填写球队名称'); return; }
+  if (!players.length) { alert('请至少填写一名队员（每行一名，可带背号）'); return; }
+  TeamLib.save(name, players, group).then((d) => {
+    if (!d || !d.ok) { alert('保存失败：' + ((d && d.error) || '未知错误')); return; }
+    $('tmName').value = '';
+    $('tmGroup').value = '';
+    $('tmPlayers').value = '';
+    renderTeamList();
+    refreshTeamMatch();
+    updatePickButtons();
+    flash('已保存「' + name + '」');
+  }).catch(() => alert('保存失败：无法连接服务器'));
+});
+
+/* ---- 批量导入：Excel 复制粘贴（Tab 分隔）或 Excel/CSV 文件（队名/组别/背号/队员） ---- */
+/** 解析文本 → { 队名: { group, players:[{no,name}] } }；自动跳过表头行 */
+function parseImportText(text) {
+  const out = {};
+  let total = 0, bad = 0;
+  String(text || '').split(/\r?\n/).forEach((line, idx) => {
+    const t = line.trim();
+    if (!t) return;
+    const cells = (t.indexOf('\t') >= 0 ? t.split('\t') : t.split(/[,，]/))
+      .map((s) => s.trim().replace(/^"|"$/g, ''));
+    // 表头行：含「队名/球队/队伍」或「队员/姓名」字样 → 跳过
+    if (idx === 0 && (/队名|球队|队伍/.test(cells[0] || '') || /队员|姓名/.test(cells[cells.length - 1] || ''))) return;
+    let name = '', group = '', no = '', player = '';
+    if (cells.length >= 4) { name = cells[0]; group = cells[1]; no = cells[2]; player = cells.slice(3).join(' ').trim(); }
+    else if (cells.length === 3) { name = cells[0]; group = cells[1]; player = cells[2]; }
+    else if (cells.length === 2) { name = cells[0]; player = cells[1]; }
+    else { bad++; return; }                          // 只有一列，无法识别
+    if (!name || !player) { bad++; return; }
+    if (!out[name]) out[name] = { group: '', players: [] };
+    if (group && !out[name].group) out[name].group = group;
+    no = String(no).replace(/[^\d]/g, '').slice(0, 3);   // 背号只保留数字
+    const dup = out[name].players.some((x) => x.name === player && x.no === no);
+    if (!dup) { out[name].players.push({ no, name: player }); total++; }
+  });
+  return { teams: out, total, bad };
+}
+
+function doImport(text) {
+  const r = parseImportText(text);
+  const names = Object.keys(r.teams);
+  if (!names.length) { alert('没有解析到有效数据\n格式：队名 / 组别 / 队员，每行一条（三列或两列）'); return; }
+  TeamLib.importTeams(r.teams).then((d) => {
+    if (!d || !d.ok) { alert('导入失败：' + ((d && d.error) || '未知错误')); return; }
+    $('tmImport').value = '';
+    renderTeamList();
+    refreshTeamMatch();
+    updatePickButtons();
+    flash(`已导入 ${names.length} 支球队 · ${r.total} 名队员` + (r.bad ? `（${r.bad} 行格式有误被跳过）` : ''));
+  }).catch(() => alert('导入失败：无法连接服务器'));
+}
+
+$('tmImportGo').addEventListener('click', () => doImport($('tmImport').value));
+$('tmImportFile').addEventListener('click', () => $('tmFile').click());
+
+/* 按需加载 SheetJS（仅在选择 Excel 文件时加载一次，约 250KB，本地文件离线可用） */
+let xlsxLoading = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  if (xlsxLoading) return xlsxLoading;
+  xlsxLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = Sync.BASE + '/xlsx.mini.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Excel 解析组件加载失败'));
+    document.head.appendChild(s);
+  });
+  return xlsxLoading;
+}
+
+$('tmFile').addEventListener('change', () => {
+  const f = $('tmFile').files && $('tmFile').files[0];
+  if (!f) return;
+  const isExcel = /\.(xlsx|xls)$/i.test(f.name);
+  if (isExcel) {
+    // Excel 文件：SheetJS 解析第一个工作表 → 转成「Tab 分隔文本」走统一解析
+    loadXLSX().then(() => new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('文件读取失败'));
+      r.readAsArrayBuffer(f);
+    })).then((buf) => {
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const text = rows.map((row) => row.slice(0, 4)
+        .map((c) => String(c == null ? '' : c).trim()).join('\t')).join('\n');
+      $('tmImport').value = text;
+      doImport(text);
+    }).catch((e) => alert('Excel 解析失败：' + e.message));
+  } else {
+    // CSV/TXT：先按 UTF-8 读，出现乱码字符再用 GBK 重读（国内 Excel 导出的 CSV 多为 GBK）
+    const r1 = new FileReader();
+    r1.onload = () => {
+      const txt = String(r1.result || '');
+      if (txt.indexOf('') >= 0) {
+        const r2 = new FileReader();
+        r2.onload = () => { $('tmImport').value = String(r2.result || ''); doImport($('tmImport').value); };
+        r2.readAsText(f, 'gbk');
+      } else {
+        $('tmImport').value = txt;
+        doImport(txt);
+      }
+    };
+    r1.readAsText(f, 'utf-8');
+  }
+  $('tmFile').value = '';
+});
+$('tmTpl').addEventListener('click', () => {
+  const rows = [
+    ['队名', '组别', '背号', '队员'],
+    ['雄鹰队', 'U10', '7', '张伟'],
+    ['雄鹰队', 'U10', '12', '王强'],
+    ['闪电队', 'U12', '3', '刘洋']
+  ];
+  const saveBlob = (blob, fname) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  // 优先生成真正的 .xlsx 模板；解析组件加载失败则退回 CSV 模板
+  loadXLSX().then(() => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 16 }, { wch: 8 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '队伍库');
+    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    saveBlob(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '队伍库导入模板.xlsx');
+  }).catch(() => {
+    const csv = '﻿' + rows.map((r) => r.join(',')).join('\r\n');
+    saveBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '队伍库导入模板.csv');
+  });
+});
+
+/* 页面加载时先拉一次队伍库，队名若已匹配立即出现“选”按钮 */
+TeamLib.load().then(() => {
+  refreshTeamMatch();
+  updatePickButtons();
+});
+
+/* ---------- 队名 / 投手（队名变化即时匹配队伍库） ---------- */
+bindInput($('nameHome'), (v) => { Sync.setTeamName(0, v); refreshTeamMatch(); updatePickButtons(); });
+bindInput($('nameAway'), (v) => { Sync.setTeamName(1, v); refreshTeamMatch(); updatePickButtons(); });
 bindInput($('pitcher'), (v) => Sync.setPitcher(v.trim()));
+
+/* ---------- 队徽上传（压缩到 64px，省流量；空则不显示） ---------- */
+function bindLogo(team, btnId, fileId, prevId, clearId) {
+  const btn = $(btnId), file = $(fileId);
+  btn.addEventListener('click', () => file.click());
+  file.addEventListener('change', () => {
+    const f = file.files[0];
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => {
+      const S = 64;
+      const cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+      const scale = Math.min(S / img.width, S / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+      URL.revokeObjectURL(img.src);
+      Sync.setLogo(team, cv.toDataURL('image/png'));
+      file.value = '';
+    };
+    img.src = URL.createObjectURL(f);
+  });
+  $(clearId).addEventListener('click', () => Sync.setLogo(team, ''));
+}
+bindLogo(1, 'logoAwayBtn', 'logoAwayFile', 'logoAwayPrev', 'logoAwayClear');   // 客队 = 索引1
+bindLogo(0, 'logoHomeBtn', 'logoHomeFile', 'logoHomePrev', 'logoHomeClear');   // 主队 = 索引0
+
+/* ---------- 比赛名称 / 主办方 Logo ---------- */
+bindInput($('matchName'), (v) => Sync.setMatchName(v.trim()));
+$('orgLogoBtn').addEventListener('click', () => $('orgLogoFile').click());
+$('orgLogoFile').addEventListener('change', () => {
+  const f = $('orgLogoFile').files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const S = 96;
+    const cv = document.createElement('canvas');
+    cv.width = S; cv.height = S;
+    const ctx = cv.getContext('2d');
+    const scale = Math.min(S / img.width, S / img.height);
+    const w = img.width * scale, h = img.height * scale;
+    ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+    URL.revokeObjectURL(img.src);
+    Sync.setOrgLogo(cv.toDataURL('image/png'));
+    $('orgLogoFile').value = '';
+  };
+  img.src = URL.createObjectURL(f);
+});
+$('orgLogoClear').addEventListener('click', () => Sync.setOrgLogo(''));
+
+/* ---------- 年龄段：全屏选择页 + 扫码卡内快捷切换 ---------- */
+const AGE_LABEL = { U8: 'U8', U10: 'U10', U12: 'U12', other: '其他' };
+document.querySelectorAll('#ageGate button, .ageChip').forEach((b) => {
+  b.addEventListener('click', () => Sync.setAgeGroup(b.dataset.age));
+});
+function paintAge(s) {
+  $('ageGate').style.display = s.ageGroup ? 'none' : 'flex';
+  document.querySelectorAll('.ageChip').forEach((b) => {
+    const on = b.dataset.age === s.ageGroup;
+    b.classList.toggle('sel', on);
+  });
+}
+
+function paintLogo(team, prevId, clearId) {
+  const url = (Sync.get().logos || [])[team] || '';
+  const prev = $(prevId), clear = $(clearId);
+  if (url) { prev.src = url; prev.style.display = ''; clear.style.display = ''; }
+  else { prev.style.display = 'none'; clear.style.display = 'none'; }
+}
 
 /* ---------- 更多 ---------- */
 $('resetAll').addEventListener('click', () => {
   if (confirm('确定清空整场比赛数据？（打序名单会保留）')) Sync.resetAll();
 });
 
-/* ---------- 扫码（仅电脑本机访问时显示） ---------- */
-(function initQR() {
-  const host = location.hostname;
-  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]') return;
+/* ---------- 结束比赛：下载数据表，并自动清空全部内容 ---------- */
+$('btnExport').addEventListener('click', () => {
+  if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会自动清空所有内容，准备下一场。')) return;
+  fetch(Sync.BASE + '/api/export', { method: 'POST' })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d.ok) { alert('导出失败：' + (d.error || '未知错误')); return; }
+      // 直接下载到当前设备（云端/手机同样可用）
+      const blob = new Blob([d.csv || ''], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = d.fname || d.file || '比赛数据.csv';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      flash('数据表已下载');
+      Sync.patch({
+        teams: ['主队', '客队'],
+        logos: ['', ''],
+        matchName: '',
+        orgLogo: '',
+        ageGroup: '',                                  // 清空后回到年龄段选择页
+        scores: [Array(Sync.MAX_INNINGS).fill(''), Array(Sync.MAX_INNINGS).fill('')],
+        he: [[0, 0], [0, 0]],
+        pitcher: '',
+        batters: [Array(9).fill(''), Array(9).fill('')],
+        positions: [Array(9).fill(''), Array(9).fill('')],
+        batterIdx: [0, 0],
+        inning: 1, half: 0, balls: 0, strikes: 0, outs: 0,
+        innings: 7,                              // 延长赛用过的局数复位
+        bases: [false, false, false],
+        playerStats: null,                       // 队员统计清零
+        pitchers: null,                          // 投手统计清零
+        errors: null                             // 失误位置统计清零
+      });
+    })
+    .catch(() => alert('导出失败：无法连接服务器'));
+});
 
-  fetch('/api/info').then((r) => r.json()).then((info) => {
-    $('lanUrl').value = info.controlUrl;
+/* ---------- 扫码（本机/公网都显示，方便手机直接扫） ---------- */
+(function initQR() {
+  fetch(Sync.BASE + '/api/info').then((r) => r.json()).then((info) => {
+    // 本机用局域网 IP（手机才连得进）；公网访问直接用当前域名（云端地址无法从服务端得知）
+    const host = location.hostname;
+    const isLocalHost = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host);
+    const url = isLocalHost ? info.controlUrl : location.origin + Sync.BASE + '/';
+    $('lanUrl').value = url;
     $('qrBlock').style.display = '';
 
-    const img = document.createElement('img');
-    img.width = 130; img.height = 130;
-    img.alt = '连接二维码';
-    img.style.cssText = 'border-radius:8px;background:#fff;padding:5px;max-width:100%';
-    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=130x130&margin=0&data='
-            + encodeURIComponent(info.controlUrl);
-    img.onerror = () => {
-      img.remove();
+    if (!renderQRInto($('qrBox'), url, 120)) {
       const tip = document.createElement('div');
       tip.className = 'tip';
-      tip.textContent = '二维码需联网生成，请手动输入下方地址';
+      tip.textContent = '二维码生成失败，请手动输入下方地址';
       $('qrBlock').insertBefore(tip, $('qrBlock').firstChild);
-    };
-    $('qrBox').appendChild(img);
+    }
   }).catch(() => {});
 })();
 

@@ -1,10 +1,15 @@
 /**
- * 棒球记分牌同步服务器（零依赖，仅用 Node 内置模块）
- *  - /            → 手机/平板控制端
- *  - /board       → 挂件页（OBS 浏览器源用）
- *  - GET  /api/state  → 获取当前状态
- *  - POST /api/state  → 提交局部更新（自动广播给所有客户端）
- *  - GET  /stream     → SSE 实时推送
+ * 棒球记分牌同步服务器（零依赖，仅用 Node 内置模块）—— 多场次版
+ *
+ *  一个服务 = 任意多个场地，场次之间数据完全隔离：
+ *  - /                → 场地选择页（入口，含各场二维码）
+ *  - /g/1/            → 1 号场手机控制端（/g/2/、/g/3/ ……任意编号都可以）
+ *  - /g/1/board       → 1 号场挂件页（OBS 浏览器源用）
+ *  - GET  /g/1/api/state → 获取该场状态
+ *  - POST /g/1/api/state → 提交局部更新（只广播给该场客户端）
+ *  - GET  /g/1/stream    → 该场 SSE 实时推送
+ *
+ *  兼容旧地址：/board、/control、/api/state、/stream 自动对应 1 号场。
  */
 const http = require('http');
 const fs = require('fs');
@@ -22,45 +27,166 @@ const STRIKES_LIMIT = COUNTS.strikes + 1;    // = 3，三振 → 记一出局
 const BALLS_LIMIT = COUNTS.balls + 1;        // = 4，四坏 → 保送上一垒
 const MAX_BATTERS = 10;                      // 打序最多 10 棒（含 DH）
 
-/* ============ 全局状态（服务端为权威） ============ */
-const state = {
-  innings: 7,                                                  // 显示的局数
-  teams: ['主队', '客队'],                                      // [主队名, 客队名]
-  scores: [Array(MAX_INNINGS).fill(''), Array(MAX_INNINGS).fill('')],
-  he: [[0, 0], [0, 0]],                                        // [队][H, E]
-  pitcher: '',                                                 // 留空则不显示在挂件上
-  batters: [Array(9).fill(''), Array(9).fill('')],             // 打序名单 [主队, 客队]，各 9~10 棒
-  batterIdx: [0, 0],                                           // 各队当前棒次 [主队, 客队]
-  inning: 1,
-  half: 0,                                                     // 0=上 1=下
-  balls: 0,
-  strikes: 0,
-  outs: 0,
-  bases: [false, false, false],                                // 一/二/三垒
-  autoAdvance: true                                            // 三出局自动换半局
-};
+/* ============ 场次管理：每个场次一份独立 state + 独立 SSE 客户端群 ============ */
+const games = new Map();   // id → { state, clients:Set, lastUpdate:Number|null }
+const STARTED_AT = Date.now();   // 服务启动时刻（后台总览页显示运行时长用）
 
-/* ============ SSE 客户端 ============ */
-const clients = new Set();
+function defaultState() {
+  return {
+    innings: 7,                                                  // 显示的局数
+    teams: ['主队', '客队'],                                      // [主队名, 客队名]
+    logos: ['', ''],                                             // 队徽图片（dataURL），[主队, 客队]，空则不显示队徽列
+    matchName: '',                                               // 比赛名称，空则挂件右上角不显示
+    orgLogo: '',                                                 // 主办方 Logo（dataURL），空则不显示
+    ageGroup: '',                                                // 年龄段：U8/U10/U12/other；U8/U10 时挂件隐藏 E 列和 B/S
+    scores: [Array(MAX_INNINGS).fill(''), Array(MAX_INNINGS).fill('')],
+    he: [[0, 0], [0, 0]],                                        // [队][H, E]
+    pitcher: '',                                                 // 留空则不显示在挂件上
+    batters: [Array(9).fill(''), Array(9).fill('')],             // 打序名单 [主队, 客队]，各 9~10 棒
+    positions: [Array(9).fill(''), Array(9).fill('')],           // 每棒守备位置 [主队, 客队]，'1'~'9'/'DH'/空
+    batterIdx: [0, 0],                                           // 各队当前棒次 [主队, 客队]
+    inning: 1,
+    half: 0,                                                     // 0=上 1=下
+    balls: 0,
+    strikes: 0,
+    outs: 0,
+    bases: [false, false, false],                                // 一/二/三垒
+    autoAdvance: true,                                           // 三出局自动换半局
+    errors: { 0: {}, 1: {} }                                     // 失误位置分布 { 队索引: { 位置号: 次数 } }
+  };
+}
 
-function broadcast() {
-  const payload = `data: ${JSON.stringify(state)}\n\n`;
-  clients.forEach((res) => {
-    try { res.write(payload); } catch (e) { clients.delete(res); }
+function getGame(id) {
+  let g = games.get(id);
+  if (!g) {
+    g = { state: normPositions(defaultState()), clients: new Set(), lastUpdate: null, history: [] };
+    games.set(id, g);
+    console.log(`  [新场次] ${id} 号场已创建（当前共 ${games.size} 场）`);
+  }
+  return g;
+}
+
+/** 守备位置数组与打序等长对齐（旧存档没有该字段，补空） */
+function normPositions(state) {
+  const len = Math.max(1, (state.batters && state.batters[0] ? state.batters[0].length : 9));
+  const src = Array.isArray(state.positions) ? state.positions : [];
+  state.positions = [0, 1].map((t) => {
+    const list = Array.isArray(src[t]) ? src[t].slice(0, len) : [];
+    while (list.length < len) list.push('');
+    return list.map((v) => (v == null ? '' : String(v)));
+  });
+  return state;
+}
+
+function broadcast(game) {
+  const payload = `data: ${JSON.stringify(game.state)}\n\n`;
+  game.clients.forEach((res) => {
+    try { res.write(payload); } catch (e) { game.clients.delete(res); }
   });
 }
 
+/* ============ 数据落盘：服务重启（含云端重启）后比分自动恢复 ============ */
+const DATA_DIR = path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'state.json');
+let saveTimer = null;
+
+function loadFromDisk() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    Object.keys(obj || {}).forEach((id) => {
+      const st = normPositions(Object.assign(defaultState(), obj[id] || {}));
+      games.set(id, { state: st, clients: new Set(), lastUpdate: null, history: [] });
+    });
+    if (games.size) console.log(`  [恢复] 已载入 ${games.size} 个场次的历史比分`);
+  } catch (e) { /* 首次运行没有存档，正常 */ }
+}
+
+/* ============ 队伍库：提前录入全部球队及队员（全场次共享，独立落盘） ============ */
+const TEAMS_FILE = path.join(DATA_DIR, 'teams.json');
+let teamsDB = {};    // { 球队名: { group:'组别(可空)', players:['队员1',...] } }
+
+function normPlayer(p) {
+  // 队员统一为 { no:'背号', name:'姓名' }；兼容字符串、"7 张伟"、"7号 张伟" 等写法
+  if (p && typeof p === 'object') {
+    const name = String(p.name || '').trim();
+    const no = String(p.no == null ? '' : p.no).trim().slice(0, 4);
+    return name ? { no, name } : null;
+  }
+  const s = String(p || '').trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,3})\s*号?\s+(.+)$/);
+  if (m) return { no: m[1], name: m[2].trim().slice(0, 20) };
+  return { no: '', name: s.slice(0, 20) };
+}
+
+function normTeam(v) {
+  // 兼容旧格式（纯数组）与新格式（{group, players}）
+  const players = (Array.isArray(v) ? v : (v && Array.isArray(v.players) ? v.players : []))
+    .map(normPlayer).filter(Boolean).slice(0, 40);
+  const group = (!Array.isArray(v) && v && v.group != null) ? String(v.group).trim().slice(0, 10) : '';
+  return players.length ? { group, players } : null;
+}
+
+function loadTeamsFromDisk() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(TEAMS_FILE, 'utf8'));
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      Object.keys(obj).forEach((name) => {
+        const t = normTeam(obj[name]);
+        if (t) teamsDB[name] = t;
+      });
+      const n = Object.keys(teamsDB).length;
+      if (n) console.log(`  [恢复] 已载入队伍库 ${n} 支球队`);
+    }
+  } catch (e) { /* 首次运行没有存档，正常 */ }
+}
+
+function saveTeamsToDisk() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(TEAMS_FILE, JSON.stringify(teamsDB, null, 2), 'utf8');
+  } catch (e) { /* 只读文件系统等异常忽略 */ }
+}
+
+function scheduleSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const obj = {};
+      games.forEach((g, id) => { obj[id] = g.state; });
+      fs.writeFileSync(DATA_FILE, JSON.stringify(obj), 'utf8');
+    } catch (e) { /* 只读文件系统等异常忽略 */ }
+  }, 800);
+}
+
 /* ============ 合并局部更新 ============ */
-function mergePatch(target, patch) {
+function mergePatch(state, patch) {
+  // 快照：事件归因要用"操作前"的进攻方 / 棒次 / 计数
+  const prev = {
+    half: state.half, inning: state.inning,
+    batterIdx: (state.batterIdx || [0, 0]).slice(),
+    outs: state.outs | 0,
+    balls: state.balls | 0,
+    strikes: state.strikes | 0,
+    he: (state.he || [[0, 0], [0, 0]]).map((r) => r.slice()),
+    scores: state.scores.map((r) => r.slice())
+  };
+
+  // play 是本次操作的“记分意图”（安打类型 / 失误位置），只用于统计归因，不写入状态
+  const play = patch.play && typeof patch.play === 'object' ? patch.play : null;
+
   for (const key of Object.keys(patch)) {
+    if (key === 'play') continue;
     const val = patch[key];
     if (Array.isArray(val)) {
-      target[key] = val.slice();
+      state[key] = val.slice();
     } else if (val && typeof val === 'object' &&
-               target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])) {
-      Object.assign(target[key], val);
+               state[key] && typeof state[key] === 'object' && !Array.isArray(state[key])) {
+      Object.assign(state[key], val);
     } else {
-      target[key] = val;
+      state[key] = val;
     }
   }
   // 安全边界
@@ -70,6 +196,12 @@ function mergePatch(target, patch) {
   state.strikes = clamp(state.strikes, STRIKES_LIMIT);
   state.outs = clamp(state.outs, OUTS_LIMIT);
   state.autoAdvance = state.autoAdvance !== false;
+
+  // B/S 联动清零：任意一个被清 0，另一个同步清 0
+  if (patch.balls === 0 || patch.strikes === 0) {
+    state.balls = 0;
+    state.strikes = 0;
+  }
 
   // 打序：两套名单（主队/客队），长度保持一致，1~10 棒；当前棒序号跟着收敛
   const norm = (arr) => (Array.isArray(arr) ? arr.slice(0, MAX_BATTERS).map(String) : []);
@@ -86,55 +218,161 @@ function mergePatch(target, patch) {
     Math.min(len - 1, Math.max(0, bi[1] | 0))
   ];
 
+  // 队员级统计：与打序等长，长度跟随收敛；重置比赛时 patch.playerStats=null 重建
+  const normStats = (arr) => {
+    const out = [];
+    for (let i = 0; i < len; i++) {
+      const s = (Array.isArray(arr) && arr[i] && typeof arr[i] === 'object') ? arr[i] : {};
+      out.push({ ab: s.ab | 0, h: s.h | 0, bb: s.bb | 0, k: s.k | 0, fo: s.fo | 0, rbi: s.rbi | 0,
+                 h1: s.h1 | 0, h2: s.h2 | 0, h3: s.h3 | 0, hr: s.hr | 0 });
+    }
+    return out;
+  };
+  state.playerStats = [
+    normStats(state.playerStats && state.playerStats[0]),
+    normStats(state.playerStats && state.playerStats[1])
+  ];
+
+  // 投手统计：按投手姓名分桶 { 名: {balls,strikes,h,k,bb,bf} }；重置比赛时 patch.pitchers=null 清空
+  if (!state.pitchers || typeof state.pitchers !== 'object' || Array.isArray(state.pitchers)) {
+    state.pitchers = {};
+  }
+  const psPitcher = state.pitcher
+    ? (state.pitchers[state.pitcher] = state.pitchers[state.pitcher] || { balls: 0, strikes: 0, h: 0, k: 0, bb: 0, bf: 0 })
+    : null;
+
+  // 好球/坏球累计到当前投手（只统计增加，清零/减少不计）
+  if (psPitcher) {
+    const dB = (state.balls | 0) - prev.balls;
+    const dS = (state.strikes | 0) - prev.strikes;
+    if (dB > 0) psPitcher.balls += dB;
+    if (dS > 0) psPitcher.strikes += dS;
+  }
+
+  // 失误位置分布：重置比赛时 patch.errors=null 重建
+  if (!state.errors || typeof state.errors !== 'object' || Array.isArray(state.errors)) {
+    state.errors = { 0: {}, 1: {} };
+  }
+  if (!state.errors[0] || typeof state.errors[0] !== 'object') state.errors[0] = {};
+  if (!state.errors[1] || typeof state.errors[1] !== 'object') state.errors[1] = {};
+
+  // ============ 事件归因到打者（在自动结算之前判定）============
+  const prevAtk = prev.half === 0 ? 1 : 0;
+  const prevCol = Math.min(MAX_INNINGS - 1, Math.max(0, prev.inning - 1));
+  const prevBi = Math.min(len - 1, prev.batterIdx[prevAtk] || 0);
+  const idxChanged = state.batterIdx[prevAtk] !== prevBi;
+  const ps = state.playerStats[prevAtk][prevBi];
+  const playHit = play && play.type === 'hit';
+  const playErr = play && play.type === 'error';
+
+  if (ps && (playHit || idxChanged)) {
+    if (playHit) {
+      // 带类型安打：按 play 显式归因，避免与普通推断重复
+      ps.h += 1; ps.ab += 1;
+      ps.rbi += Math.max(0, play.runs | 0);
+      if (play.hit === '2B') ps.h2 += 1;
+      else if (play.hit === '3B') ps.h3 += 1;
+      else if (play.hit === 'HR') ps.hr += 1;
+      else ps.h1 += 1;
+      if (psPitcher) { psPitcher.h += 1; psPitcher.bf += 1; }      // 被安打 + 面对打席
+    } else {
+      // 安打：进攻方 H 增加且换棒 → 记上一棒 h/ab，得分差记打点
+      const dh = (state.he[prevAtk][0] | 0) - (prev.he[prevAtk][0] | 0);
+      if (dh > 0) {
+        ps.h += dh; ps.ab += dh;
+        if (psPitcher) { psPitcher.h += dh; psPitcher.bf += dh; }  // 被安打 + 面对打席
+        const dr = (parseInt(state.scores[prevAtk][prevCol], 10) || 0)
+                 - (parseInt(prev.scores[prevAtk][prevCol], 10) || 0);
+        if (dr > 0) ps.rbi += dr;
+      }
+      // 手动出局（非三振）：outs 增加且换棒 → 记 fo/ab
+      const dOut = (state.outs | 0) - prev.outs;
+      if (dh <= 0 && dOut > 0) {
+        ps.ab += dOut; ps.fo += dOut;
+        if (psPitcher) psPitcher.bf += dOut;                       // 面对打席
+      }
+    }
+  }
+
+  // 带位置失误：记防守方该守备位置 +1（1=投手 … 9=右外野）
+  if (playErr) {
+    const def = prev.half === 0 ? 0 : 1;
+    const pos = play.pos | 0;
+    if (pos >= 1 && pos <= 9) {
+      state.errors[def][pos] = (state.errors[def][pos] | 0) + 1;
+    }
+    // 打者因失误上垒：记打数（不算安打、不记打点），投手面对打席 +1
+    if (ps) ps.ab += 1;
+    if (psPitcher) psPitcher.bf += 1;
+  }
+
   // ============ 球数自动结算（受 autoAdvance 开关统一控制）============
   if (state.autoAdvance) {
-    if (state.balls >= BALLS_LIMIT) walkBatter();        // 四坏球 → 保送
-    if (state.strikes >= STRIKES_LIMIT) strikeOut();     // 三好球 → 三振
-    if (state.outs >= OUTS_LIMIT) advanceHalf();         // 三出局 → 换半局
+    if (state.balls >= BALLS_LIMIT) walkBatter(state);        // 四坏球 → 保送
+    if (state.strikes >= STRIKES_LIMIT) strikeOut(state);     // 三好球 → 三振
+    if (state.outs >= OUTS_LIMIT) advanceHalf(state);         // 三出局 → 换半局
   }
 }
 
 /** 进攻方索引：上半局客队(1)，下半局主队(0) */
-function attackingTeam() { return state.half === 0 ? 1 : 0; }
+function attackingTeam(state) { return state.half === 0 ? 1 : 0; }
 
 /** 推进到下一棒 */
-function advanceBatter(team) {
+function advanceBatter(state, team) {
   const len = Math.max(1, state.batters[team].length);
   state.batterIdx[team] = (state.batterIdx[team] + 1) % len;
 }
 
 /** 放一名跑者到 at 垒(0/1/2)；被占则原跑者强制推进，越过三垒记 1 分 */
-function pushRunner(at, onScore) {
+function pushRunner(state, at, onScore) {
   if (at > 2) { onScore(); return; }
   if (!state.bases[at]) { state.bases[at] = true; return; }
   state.bases[at] = false;
-  pushRunner(at + 1, onScore);
+  pushRunner(state, at + 1, onScore);
   state.bases[at] = true;
 }
 
+/** 当前投手的统计桶（无投手名则返回 null） */
+function pitcherStat(state) {
+  if (!state.pitcher) return null;
+  if (!state.pitchers || typeof state.pitchers !== 'object') state.pitchers = {};
+  return state.pitchers[state.pitcher] = state.pitchers[state.pitcher] || { balls: 0, strikes: 0, h: 0, k: 0, bb: 0, bf: 0 };
+}
+
 /** 四坏球保送：打者上一垒（满垒则挤回 1 分），并换下一棒 */
-function walkBatter() {
-  const atk = attackingTeam();
+function walkBatter(state) {
+  const atk = attackingTeam(state);
   const col = Math.min(MAX_INNINGS - 1, Math.max(0, state.inning - 1));
-  pushRunner(0, () => {
+  const ps = state.playerStats && state.playerStats[atk][state.batterIdx[atk]];
+  if (ps) ps.bb += 1;                                       // 保送记到当前打者
+  const pit = pitcherStat(state);
+  if (pit) { pit.bb += 1; pit.bf += 1; }                    // 保送记到当前投手
+  pushRunner(state, 0, () => {
     const cur = parseInt(state.scores[atk][col], 10) || 0;
     state.scores[atk][col] = String(cur + 1);
+    if (ps) ps.rbi += 1;                                    // 满垒挤回的分记当前打者打点
   });
   state.balls = 0;
-  advanceBatter(atk);
+  state.strikes = 0;
+  advanceBatter(state, atk);
 }
 
 /** 三振：记一个出局，并换下一棒 */
-function strikeOut() {
+function strikeOut(state) {
+  const ps = state.playerStats && state.playerStats[attackingTeam(state)][state.batterIdx[attackingTeam(state)]];
+  if (ps) { ps.k += 1; ps.ab += 1; }                        // 三振记到当前打者
+  const pit = pitcherStat(state);
+  if (pit) { pit.k += 1; pit.bf += 1; }                     // 三振记到当前投手
   state.strikes = 0;
+  state.balls = 0;
   state.outs = clamp(state.outs + 1, OUTS_LIMIT);
-  advanceBatter(attackingTeam());
+  advanceBatter(state, attackingTeam(state));
 }
 
 function clamp(v, max) { return Math.min(max, Math.max(0, v | 0)); }
 
 /** 推进到下一个半局，并清零球数与垒包 */
-function advanceHalf() {
+function advanceHalf(state) {
   if (state.half === 0) {
     state.half = 1;
   } else if (state.inning < state.innings) {
@@ -175,10 +413,7 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
-function serveStatic(req, res, pathname) {
-  let file = pathname === '/' ? '/control.html'
-           : pathname === '/board' ? '/scoreboard.html'
-           : pathname;
+function serveFile(res, file) {
   const filePath = path.join(PUBLIC_DIR, path.normalize(file).replace(/^([/\\])+/, ''));
   if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(filePath, (err, data) => {
@@ -189,28 +424,233 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+/* ============ 导出队员数据表（CSV） ============ */
+const POS_NAME = {
+  1: '投手', 2: '捕手', 3: '一垒手', 4: '二垒手', 5: '三垒手',
+  6: '游击手', 7: '左外野', 8: '中外野', 9: '右外野', DH: '指定打击'
+};
+function posNameOf(v) {
+  const k = String(v == null ? '' : v).trim();
+  return POS_NAME[k] || '';
+}
+
+function exportCSV(gameId, state) {
+  const esc = (v) => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [];
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  lines.push(`棒球比赛队员数据（${gameId} 号场）`);
+  lines.push(`导出时间,${stamp}`);
+  lines.push(`对阵,${esc(state.teams[1])}(客) vs ${esc(state.teams[0])}(主)`);
+  lines.push('');
+
+  // 客队在上、主队在下
+  [1, 0].forEach((r) => {
+    const runs = state.scores[r].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+    lines.push(`【${esc(state.teams[r])}】 总得分 R=${runs}  安打 H=${state.he[r][0] | 0}  失误 E=${state.he[r][1] | 0}`);
+    lines.push('打序,姓名,守备位置,打数,安打,打点,一垒安打,二垒安打,三垒安打,全垒打,保送,三振,其他出局,打击率');
+    const stats = (state.playerStats && state.playerStats[r]) || [];
+    const posList = (state.positions && state.positions[r]) || [];
+    state.batters[r].forEach((name, i) => {
+      const p = stats[i] || { ab: 0, h: 0, bb: 0, k: 0, fo: 0, rbi: 0, h1: 0, h2: 0, h3: 0, hr: 0 };
+      if (!name && !(p.ab || p.h || p.bb || p.k || p.fo || p.rbi)) return;   // 空名且无数据 → 跳过
+      const avg = p.ab > 0 ? (p.h / p.ab).toFixed(3) : '-';
+      const posTxt = posNameOf(posList[i]);
+      lines.push([i + 1, esc(name || `第${i + 1}棒`), posTxt, p.ab, p.h, p.rbi, p.h1 | 0, p.h2 | 0, p.h3 | 0, p.hr | 0, p.bb, p.k, p.fo, avg].join(','));
+    });
+    // 失误位置明细（如：E1×2, E5×1）
+    const errs = state.errors && state.errors[r] ? state.errors[r] : {};
+    const parts = Object.keys(errs).sort((a, b) => a - b).map((pos) => `E${pos}×${errs[pos] | 0}`);
+    if (parts.length) lines.push('失误明细,' + parts.join(', '));
+    lines.push('');
+  });
+
+  // 投手数据（按姓名分桶，换投手自动分行；全 0 的空桶不导出）
+  const pitchers = state.pitchers && typeof state.pitchers === 'object' ? state.pitchers : {};
+  const names = Object.keys(pitchers).filter((name) => {
+    const p = pitchers[name] || {};
+    return (p.balls | 0) + (p.strikes | 0) + (p.bf | 0) > 0;
+  });
+  if (names.length) {
+    lines.push('【投手数据】');
+    lines.push('姓名,好球,坏球,好球率,面对打席,被安打,三振,保送,三振率');
+    names.forEach((name) => {
+      const p = pitchers[name];
+      const total = (p.balls | 0) + (p.strikes | 0);
+      const sRate = total > 0 ? (p.strikes / total * 100).toFixed(1) + '%' : '-';
+      const kRate = p.bf > 0 ? (p.k / p.bf * 100).toFixed(1) + '%' : '-';
+      lines.push([esc(name), p.strikes | 0, p.balls | 0, sRate, p.bf | 0, p.h | 0, p.k | 0, p.bb | 0, kRate].join(','));
+    });
+    lines.push('');
+  }
+
+  // 文件名自动带对阵双方队名（非法字符剔除，未填队名时退回编号命名）
+  const clean = (s) => String(s || '').replace(/[\\/:*?"<>|\r\n]/g, '').trim();
+  const awayName = clean(state.teams[1]);
+  const homeName = clean(state.teams[0]);
+  const vsPart = (awayName || homeName) ? `${awayName || '客队'}vs${homeName || '主队'}` : `${gameId}号场`;
+  const fname = `比赛数据_${vsPart}_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.csv`;
+  const csv = '﻿' + lines.join('\r\n');   // BOM 让 Excel 正确识别中文
+
+  // 本机跑服务时仍顺手存一份到桌面；云端没有桌面则跳过，改由浏览器下载
+  try {
+    const desktop = path.join(os.homedir(), 'Desktop');
+    if (fs.existsSync(desktop)) fs.writeFileSync(path.join(desktop, fname), csv, 'utf8');
+  } catch (e) { /* 无桌面目录（云端）忽略 */ }
+
+  return { fname, csv };
+}
+
 /* ============ 路由 ============ */
 const server = http.createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let { pathname } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+  // 解析场次：/g/<id>/... ；不带 /g/ 的旧地址全部归入 1 号场
+  let gameId = '1';
+  let isLobby = false;
+  const m = pathname.match(/^\/g\/([^/]+)(\/.*)?$/);
+  if (m) {
+    gameId = decodeURIComponent(m[1]).replace(/[^\w\-一-龥]/g, '').slice(0, 20) || '1';
+    pathname = m[2] || '/';
+  } else if (pathname === '/') {
+    isLobby = true;                                  // 根路径 = 场地选择页
+  } else if (pathname === '/control') {
+    pathname = '/';                                  // 旧控制端地址 → 1 号场
+  }
+
+  if (isLobby) return serveFile(res, '/lobby.html');
+
+  // 后台总览页：/admin（全局页面，不属于任何场次）
+  if (m === null && pathname === '/admin') return serveFile(res, '/admin.html');
+  if (m === null && pathname === '/api/overview') {
+    const list = [];
+    games.forEach((g, id) => {
+      const st = g.state;
+      const sum = (arr) => (arr || []).reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
+      list.push({
+        id,
+        teams: st.teams,
+        score: [sum(st.scores[1]), sum(st.scores[0])],        // [客队总分, 主队总分]
+        inning: st.inning, half: st.half, innings: st.innings,
+        ageGroup: st.ageGroup || '',
+        online: g.clients.size,                               // 实时连接数（打开的控制端+挂件页）
+        lastUpdate: g.lastUpdate
+      });
+    });
+    list.sort((a, b) => String(a.id).localeCompare(String(b.id), 'zh-Hans-CN', { numeric: true }));
+    return sendJson(res, {
+      ok: true,
+      startedAt: STARTED_AT,
+      now: Date.now(),
+      port: PORT,
+      games: list,
+      teams: teamsDB
+    });
+  }
+
+  const game = getGame(gameId);
+  const base = `/g/${gameId}`;
 
   if (pathname === '/api/state') {
     if (req.method === 'POST') {
       const patch = await readBody(req);
-      mergePatch(state, patch);
-      broadcast();
-      return sendJson(res, { ok: true, state });
+      // 撤销栈：每次提交前保存整场快照（最多 40 步）
+      game.history.push(JSON.stringify(game.state));
+      if (game.history.length > 40) game.history.shift();
+      mergePatch(game.state, patch);
+      normPositions(game.state);
+      game.lastUpdate = Date.now();
+      broadcast(game);
+      scheduleSave();
+      return sendJson(res, { ok: true, state: game.state });
     }
-    return sendJson(res, state);
+    return sendJson(res, game.state);
+  }
+
+  if (pathname === '/api/undo') {
+    if (req.method !== 'POST') return sendJson(res, { ok: false, error: '请用 POST' }, 405);
+    const snap = game.history.pop();
+    if (!snap) return sendJson(res, { ok: false, error: '没有可撤销的操作' }, 400);
+    try {
+      game.state = normPositions(JSON.parse(snap));
+    } catch (e) {
+      return sendJson(res, { ok: false, error: '撤销失败：快照损坏' }, 500);
+    }
+    game.lastUpdate = Date.now();
+    broadcast(game);
+    scheduleSave();
+    return sendJson(res, { ok: true, state: game.state });
+  }
+
+  if (pathname === '/api/teams') {
+    // 队伍库是全局数据（不按场次隔离），控制端据此自动填充打序
+    if (req.method === 'POST') {
+      const body = await readBody(req);
+      if (body && body.clearAll) {                                // 清空整个队伍库
+        teamsDB = {};
+        saveTeamsToDisk();
+      } else if (body && body.delete) {                           // 删除球队（单个字符串或字符串数组）
+        const names = Array.isArray(body.delete) ? body.delete : [body.delete];
+        names.slice(0, 100).forEach((n) => { delete teamsDB[String(n)]; });
+        saveTeamsToDisk();
+      } else if (body && body.import && typeof body.import === 'object') {
+        // 批量导入：{ import: { 队名: { group, players:[...] } } }，同名覆盖
+        let n = 0;
+        Object.keys(body.import).slice(0, 100).forEach((nm) => {
+          const name = String(nm).trim().slice(0, 30);
+          const t = normTeam(body.import[nm]);
+          if (name && t) { teamsDB[name] = t; n++; }
+        });
+        if (n) saveTeamsToDisk();
+        if (!n) return sendJson(res, { ok: false, error: '没有可导入的有效球队数据' }, 400);
+      } else if (body && body.name) {                             // 新增/覆盖球队
+        const name = String(body.name).trim().slice(0, 30);
+        const t = normTeam({ group: body.group, players: body.players });
+        if (name && t) {
+          teamsDB[name] = t;
+          saveTeamsToDisk();
+        } else {
+          return sendJson(res, { ok: false, error: '球队名和队员名单都不能为空' }, 400);
+        }
+      }
+    }
+    return sendJson(res, { ok: true, teams: teamsDB });
   }
 
   if (pathname === '/api/info') {
-    const ip = lanIP();
+    // 本机访问（localhost）→ 用局域网 IP，方便手机扫码；
+    // 公网访问（云端域名）→ 用请求头里的真实域名，手机扫码直接可用
+    const h = req.headers;
+    const host = String(h['x-forwarded-host'] || h.host || '');
+    const hostname = host.split(':')[0];
+    const isLocal = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(hostname) || !hostname;
+    const proto = String(h['x-forwarded-proto'] || '').split(',')[0].trim()
+      || (/^(localhost|127\.|\[::1\])/.test(hostname) ? 'http' : 'https');
+    const origin = isLocal ? `http://${lanIP()}:${PORT}` : `${proto}://${host}`;
     return sendJson(res, {
-      ip,
+      ip: lanIP(),
       port: PORT,
-      controlUrl: `http://${ip}:${PORT}/`,
-      boardUrl: `http://localhost:${PORT}/board`
+      game: gameId,
+      games: Array.from(games.keys()),
+      origin,
+      local: isLocal,
+      controlUrl: `${origin}${base}/`,
+      boardUrl: `${origin}${base}/board`
     });
+  }
+
+  if (pathname === '/api/export') {
+    try {
+      const { fname, csv } = exportCSV(gameId, game.state);
+      return sendJson(res, { ok: true, file: fname, fname, csv });
+    } catch (e) {
+      return sendJson(res, { ok: false, error: String(e && e.message || e) }, 500);
+    }
   }
 
   if (pathname === '/stream') {
@@ -221,16 +661,19 @@ const server = http.createServer(async (req, res) => {
       'X-Accel-Buffering': 'no'
     });
     res.write(`retry: 2000\n\n`);
-    res.write(`data: ${JSON.stringify(state)}\n\n`);
-    clients.add(res);
+    res.write(`data: ${JSON.stringify(game.state)}\n\n`);
+    game.clients.add(res);
     const keepAlive = setInterval(() => {
       try { res.write(': ping\n\n'); } catch (e) { /* ignore */ }
     }, 25000);
-    req.on('close', () => { clearInterval(keepAlive); clients.delete(res); });
+    req.on('close', () => { clearInterval(keepAlive); game.clients.delete(res); });
     return;
   }
 
-  serveStatic(req, res, pathname);
+  // 静态页面：/ → 控制端，/board → 挂件页，其余按文件名
+  if (pathname === '/') return serveFile(res, '/control.html');
+  if (pathname === '/board') return serveFile(res, '/scoreboard.html');
+  serveFile(res, pathname);
 });
 
 /* ============ 启动 ============ */
@@ -244,13 +687,18 @@ function lanIP() {
   return '127.0.0.1';
 }
 
+loadFromDisk();                     // 有存档则恢复上次比分
+loadTeamsFromDisk();                // 有队伍库存档则恢复球队名单
+
 server.listen(PORT, '0.0.0.0', () => {
   const ip = lanIP();
   console.log('');
-  console.log('  棒球记分牌服务已启动');
+  console.log('  棒球记分牌服务已启动（多场次版）');
   console.log('  ------------------------------------------');
-  console.log(`  挂件页（OBS 浏览器源）: http://localhost:${PORT}/board`);
-  console.log(`  手机控制端（同一 WiFi）: http://${ip}:${PORT}/`);
+  console.log(`  场地选择页（入口）    : http://${ip}:${PORT}/`);
+  console.log(`  1 号场控制端          : http://${ip}:${PORT}/g/1/`);
+  console.log(`  1 号场挂件（OBS 源）  : http://localhost:${PORT}/g/1/board`);
+  console.log(`  2 号场把地址里的 1 改成 2 即可，场次不限`);
   console.log('  ------------------------------------------');
   console.log('  手机和电脑需连同一个 WiFi；关闭窗口即停止服务。');
   console.log('');
