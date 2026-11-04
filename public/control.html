@@ -78,7 +78,6 @@
   button.warn { background: #4a2b2b; border-color: var(--red); color: #ffd9d9; }
   button.sel { background: #155e6e; border-color: var(--yellow); color: var(--yellow); }
   button.mini { min-height: 30px; padding: 5px 3px; font-size: 11px; }
-  .logoPrev { width: 28px; height: 28px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; }
   button.sq { width: 32px; min-height: 30px; padding: 0; font-size: 15px; line-height: 1; flex: none; }
   /* 得分录入的加减号：加大版 */
   button.sq-lg { width: 48px; min-height: 42px; padding: 0; font-size: 24px; line-height: 1; flex: none; border-radius: 10px; }
@@ -189,239 +188,9 @@
   .batcol-head.cur { color: var(--yellow); font-weight: bold; }
 
   .tip { font-size: 10px; opacity: .5; margin-top: 5px; line-height: 1.5; }
-
-  /* ---------- 年龄段选择页（未选择时全屏覆盖） ---------- */
-  #ageGate {
-    position: fixed; inset: 0; z-index: 99;
-    background: var(--bg);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; padding: 24px;
-  }
-  #ageGate h2 { font-size: 20px; color: var(--cyan); letter-spacing: 2px; }
-  #ageGate .sub { font-size: 12px; opacity: .6; margin-bottom: 10px; }
-  #ageGate button {
-    width: 100%; max-width: 300px; padding: 16px 0;
-    font-size: 20px; font-weight: bold; border-radius: 12px; cursor: pointer;
-    background: #123240; color: var(--cyan-l); border: 2px solid var(--cyan);
-  }
-  #ageGate button:active { background: var(--cyan); color: #06222e; }
-
-  /* ---------- 安打 / 失误 选择弹窗 ---------- */
-  #playModal {
-    position: fixed; inset: 0; z-index: 60;
-    display: none; align-items: center; justify-content: center;
-    background: rgba(0, 12, 18, .65);
-  }
-  #playModal.on { display: flex; }
-  #playModal .mcard {
-    width: min(86vw, 300px);
-    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
-    padding: 14px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
-  }
-  #playModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
-  #playModal .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 10px; }
-  #playModal .mgrid { display: grid; gap: 8px; }
-  #playModal.hit .mgrid { grid-template-columns: 1fr 1fr; }
-  #playModal.err .mgrid { grid-template-columns: repeat(3, 1fr); }
-  #playModal .mopt {
-    min-height: 50px; font-size: 15px; border-radius: 10px;
-    background: #123240; color: var(--cyan-l); border: 1.5px solid var(--cyan);
-  }
-  #playModal .mopt.primary { background: #155e6e; }
-  #playModal .mopt:active { background: var(--cyan); color: #06222e; }
-  #playModal .mcancel {
-    width: 100%; margin-top: 10px; min-height: 36px; border-radius: 10px;
-    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
-    color: var(--cyan-l); font-size: 13px; opacity: .85;
-  }
-
-  /* ---------- 队员选择弹窗（点棒次选人，支持拼音首字母搜索） ---------- */
-  #pickModal {
-    position: fixed; inset: 0; z-index: 65;
-    display: none; align-items: center; justify-content: center;
-    background: rgba(0, 12, 18, .65);
-  }
-  #pickModal.on { display: flex; }
-  #pickModal .mcard {
-    width: min(88vw, 320px); max-height: 84vh;
-    display: flex; flex-direction: column;
-    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
-    padding: 12px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
-  }
-  #pickModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
-  #pickModal .msub { text-align: center; font-size: 10px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; }
-  #pickModal .pkSearch { margin-bottom: 7px; font-size: 12px; }
-  #pickModal .pkList { overflow-y: auto; max-height: 48vh; display: flex; flex-direction: column; gap: 5px; }
-  #pickModal .pkopt {
-    text-align: left; padding: 8px 10px; min-height: 38px; font-size: 14px;
-    background: #123240; color: var(--cyan-l);
-    border: 1px solid rgba(47, 212, 232, .4); border-radius: 8px;
-  }
-  #pickModal .pkopt:active { background: var(--cyan); color: #06222e; }
-  #pickModal .pkno {
-    display: inline-block; min-width: 22px; text-align: center; margin-right: 6px;
-    background: rgba(255, 210, 77, .15); border: 1px solid rgba(255, 210, 77, .4);
-    color: var(--yellow); border-radius: 6px; font-size: 11px; padding: 1px 4px;
-  }
-  #pickModal .pkopt:active .pkno { color: #06222e; border-color: #06222e; background: transparent; }
-  #pickModal .pkEmpty { text-align: center; font-size: 11px; opacity: .5; padding: 10px 0; }
-  #pickModal .mcancel {
-    width: 100%; margin-top: 8px; min-height: 36px; border-radius: 10px;
-    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
-    color: var(--cyan-l); font-size: 13px; opacity: .85;
-  }
-
-  /* ---------- 队伍库管理弹窗（提前录入球队+队员） ---------- */
-  #teamModal {
-    position: fixed; inset: 0; z-index: 70;
-    display: none; align-items: center; justify-content: center;
-    background: rgba(0, 12, 18, .65);
-  }
-  #teamModal.on { display: flex; }
-  #teamModal .tcard {
-    width: min(92vw, 360px); max-height: 86vh;
-    display: flex; flex-direction: column; overflow-y: auto;
-    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
-    padding: 12px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .55);
-  }
-  #teamModal .mtitle { text-align: center; font-size: 15px; font-weight: bold; color: var(--cyan); letter-spacing: 1px; }
-  #teamModal .msub { text-align: center; font-size: 10px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; }
-  #teamModal .tlist { max-height: 28vh; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
-  #teamModal .trow { display: flex; align-items: center; gap: 5px; }
-  #teamModal .tname {
-    flex: 1; text-align: left; padding: 8px 10px; min-height: 36px; font-size: 13px;
-    background: #123240; color: var(--cyan-l);
-    border: 1px solid rgba(47, 212, 232, .4); border-radius: 8px;
-  }
-  #teamModal .trow .mini { width: 44px; flex: none; }
-  #teamModal .tmEmpty { text-align: center; font-size: 11px; opacity: .5; padding: 8px 0; }
-  /* 批量操作栏 */
-  #teamModal .tbulk { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  #teamModal .tcheckall { font-size: 11px; color: var(--cyan-l); display: flex; align-items: center; gap: 4px; flex: 1; cursor: pointer; }
-  #teamModal .tbulk .mini { min-height: 28px; font-size: 11px; padding: 0 10px; }
-  #teamModal .trow input[type=checkbox] { flex: none; width: 15px; height: 15px; accent-color: var(--cyan); }
-  /* 花名册（点队名展开） */
-  #teamModal .troster {
-    margin: 2px 0 6px 20px; border-left: 2px solid rgba(127, 231, 247, .25);
-    padding: 2px 0 2px 8px; display: flex; flex-direction: column; gap: 2px;
-  }
-  #teamModal .tmem { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 6px; border-radius: 6px; background: rgba(12, 28, 34, .6); }
-  #teamModal .tmem .tseq { width: 16px; text-align: right; font-size: 10px; opacity: .4; flex: none; }
-  #teamModal .tmem .tno {
-    min-width: 24px; text-align: center; flex: none; font-size: 11px;
-    color: var(--yellow); background: rgba(255, 210, 77, .12);
-    border: 1px solid rgba(255, 210, 77, .3); border-radius: 5px; padding: 0 3px;
-  }
-  #teamModal textarea {
-    width: 100%; height: 92px; font-family: inherit; font-size: 12px; color: #fff;
-    background: #0c1c22; border: 1px solid var(--line); border-radius: 8px;
-    padding: 6px 8px; outline: none; resize: vertical;
-  }
-  #teamModal textarea:focus { border-color: var(--yellow); }
-  #teamModal .mcancel {
-    width: 100%; margin-top: 8px; min-height: 36px; border-radius: 10px;
-    background: transparent; border: 1px solid rgba(127, 231, 247, .35);
-    color: var(--cyan-l); font-size: 13px; opacity: .85;
-  }
-  /* 批量导入区 */
-  #teamModal .importbox {
-    margin-top: 10px; border-top: 1px dashed rgba(127, 231, 247, .3); padding-top: 8px;
-  }
-  #teamModal .imptitle { font-size: 11px; color: var(--cyan-l); margin-bottom: 5px; opacity: .9; }
-  #teamModal #tmImport { height: 74px; font-size: 11px; }
-  #teamModal .improw { display: flex; gap: 6px; margin-top: 6px; }
-  #teamModal .improw .primary { flex: 1; min-height: 34px; font-size: 12px; }
-  #teamModal .improw .mini { flex: 1; min-height: 34px; font-size: 11px; }
-  #teamModal .imptip { font-size: 10px; opacity: .5; margin-top: 5px; }
-
-  /* 打序行里的“从队伍库选人”小按钮 */
-  .bno.pick { color: var(--cyan-l); background: #123240; font-size: 11px; }
 </style>
 </head>
 <body>
-
-<!-- 年龄段选择页：未选择时全屏覆盖，选完进入控制端 -->
-<div id="ageGate" style="display:none">
-  <h2>⚾ 选择比赛年龄段</h2>
-  <div class="sub">U8 / U10 的挂件不显示 E 列和好/坏球</div>
-  <button data-age="U8">U8</button>
-  <button data-age="U10">U10</button>
-  <button data-age="U12">U12</button>
-  <button data-age="other">其他</button>
-</div>
-
-<!-- 安打 / 失误 选择弹窗 -->
-<div id="playModal">
-  <div class="mcard">
-    <div class="mtitle" id="pmTitle">安打</div>
-    <div class="msub" id="pmSub"></div>
-    <div class="mgrid" id="pmGrid"></div>
-    <button class="mcancel" id="pmCancel">取消</button>
-  </div>
-</div>
-
-<!-- 队员选择弹窗：点击棒次的“选”按钮，从队伍库选人 -->
-<div id="pickModal">
-  <div class="mcard">
-    <div class="mtitle" id="pkTitle">选择队员</div>
-    <div class="msub" id="pkSub">已被其他棒次选中的队员不再出现</div>
-    <input type="text" id="pkSearch" class="pkSearch" placeholder="搜索：姓名 / 拼音首字母 / 背号">
-    <div class="pkList" id="pkList"></div>
-    <div class="pkEmpty" id="pkEmpty" style="display:none">没有匹配的队员</div>
-    <button class="mcancel" id="pkCancel">取消</button>
-  </div>
-</div>
-
-<!-- 守备位置选择弹窗 -->
-<div id="posModal">
-  <div class="mcard">
-    <div class="mtitle">守备位置</div>
-    <div class="msub" id="posSub"></div>
-    <div class="mgrid" id="posGrid"></div>
-    <button class="mcancel" id="posCancel">取消</button>
-  </div>
-</div>
-
-<!-- 队伍库管理弹窗：提前录入所有球队及队员名单 -->
-<div id="teamModal">
-  <div class="tcard">
-    <div class="mtitle">⚾ 队伍库</div>
-    <div class="msub">提前录入球队与队员；控制端输入队名即可自动匹配选人</div>
-    <div class="tbulk" id="tmBulkBar" style="display:none">
-      <label class="tcheckall"><input type="checkbox" id="tmCheckAll"> 全选</label>
-      <button id="tmDelSel" class="mini warn">删除所选</button>
-      <button id="tmClearAll" class="mini warn">清空全部</button>
-    </div>
-    <div class="tlist" id="tmList"></div>
-    <div class="field"><label>球队名称</label><input type="text" id="tmName" placeholder="如：雄鹰队"></div>
-    <div class="field" style="margin-top:6px"><label>组别（选填；填 U8/U10/U12 时匹配后自动设置年龄段）</label>
-      <input type="text" id="tmGroup" list="groupOpts" placeholder="如：U10 或 A组">
-      <datalist id="groupOpts"><option>U8</option><option>U10</option><option>U12</option><option>其他</option></datalist>
-    </div>
-    <div class="field" style="margin-top:6px"><label>队员名单（每行一名，可带背号，最多 40 人）</label>
-      <textarea id="tmPlayers" placeholder="7 张伟&#10;12 王强&#10;刘洋"></textarea>
-    </div>
-    <div class="grid2" style="margin-top:8px">
-      <button id="tmSave" class="primary">保存球队</button>
-      <button id="tmFormClear" class="mini">清空表单</button>
-    </div>
-
-    <!-- 批量导入：从 Excel 复制三列（队名/组别/队员）粘贴，或选择 CSV 文件 -->
-    <div class="importbox">
-      <div class="imptitle">📋 批量导入（四列：队名 / 组别 / 背号 / 队员）</div>
-      <textarea id="tmImport" placeholder="从 Excel 选中列复制后粘贴到这里：&#10;雄鹰队&#9;U10&#9;7&#9;张伟&#10;雄鹰队&#9;U10&#9;12&#9;王强&#10;闪电队&#9;&#9;3&#9;刘洋&#10;&#10;也支持三列（队名/组别/队员）或两列（队名/队员）"></textarea>
-      <div class="improw">
-        <button id="tmImportGo" class="primary">解析并导入</button>
-        <button id="tmImportFile" class="mini">选择表格文件</button>
-        <button id="tmTpl" class="mini">下载模板</button>
-      </div>
-      <div class="imptip">支持 Excel（.xlsx/.xls）和 CSV 文件；Excel 另存为 CSV 也可以</div>
-      <input type="file" id="tmFile" accept=".xlsx,.xls,.csv,.txt,.tsv" style="display:none">
-    </div>
-
-    <button class="mcancel" id="tmClose">关闭</button>
-  </div>
-</div>
 
 <div class="layout">
 
@@ -436,20 +205,7 @@
     <div class="conn bad" id="conn"><span class="dotlive"></span><span id="connText">连接中</span></div>
   </div>
 
-  <!-- 局数横条（全宽） -->
-  <div class="card full innbar">
-    <span class="h3t">局数</span>
-    <button id="prevInn" class="mini sq" title="上一半局">◀</button>
-    <div class="innbox" id="innNow">1局上</div>
-    <button id="nextInn" class="mini sq" title="下一半局">▶</button>
-    <button id="toggleHalf" class="mini">换上/下</button>
-    <button id="addInn" class="mini sq" title="增加一局（延长赛）">+局</button>
-    <button id="autoSwitch" class="mini">自动:开</button>
-  </div>
-
-  <!-- 左列：得分录入 + 比赛信息 -->
-  <div class="stack">
-
+  <!-- 左列：局数 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">得分录入</span>
@@ -468,27 +224,7 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="h3row">
-      <span class="h3t">比赛信息</span>
-      <span class="ftip">显示在挂件右上角</span>
-    </div>
-    <div class="field"><label>比赛名称（空则不显示）</label><input type="text" id="matchName" placeholder="如：XX杯棒球邀请赛"></div>
-    <div class="field" style="margin-top:5px"><label>主办方 Logo（空则不显示）</label>
-      <div class="line">
-        <button class="mini" id="orgLogoBtn" style="width:52px">上传</button>
-        <img class="logoPrev" id="orgLogoPrev" style="display:none" alt="">
-        <button class="mini" id="orgLogoClear" style="display:none;width:46px">清除</button>
-      </div>
-      <input type="file" id="orgLogoFile" accept="image/*" hidden>
-    </div>
-  </div>
-
-  </div>
-
-  <!-- 右列：球数计数 + 场上操作 -->
-  <div class="stack">
-
+  <!-- 右列：球数计数 + 垒包 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">球数计数</span>
@@ -521,6 +257,7 @@
     <button id="btnFoul" class="mini" style="width:100%;margin-top:5px" title="2 好球后界外不再累计好球数">界外（2好球后不计）</button>
   </div>
 
+  <!-- 左列：安打 / 失误 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">场上操作</span>
@@ -530,9 +267,25 @@
       <button id="btnHit" class="primary">安打 +1</button>
       <button id="btnError">失误 +1</button>
     </div>
-    <button id="btnHeClear" class="mini" style="width:100%;margin-top:5px">清除 H / E</button>
   </div>
 
+  <!-- 右列：得分录入 -->
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">得分录入</span>
+      <span class="ftip" id="scoreTip">客队 第1局 0</span>
+    </div>
+    <div class="line">
+      <button id="teamAway" class="mini" style="flex:1">客队</button>
+      <button id="teamHome" class="mini" style="flex:1">主队</button>
+      <button id="scoreClear" class="mini" style="width:44px">清零</button>
+    </div>
+    <div class="chips flexchips" id="inningChips" style="margin-top:5px"></div>
+    <div class="line" style="margin-top:5px;justify-content:center">
+      <button data-score="-1" class="sq-lg">−</button>
+      <div class="val" id="scoreVal">0</div>
+      <button data-score="1" class="sq-lg primary">＋</button>
+    </div>
   </div>
 
   <div class="card full">
@@ -561,9 +314,7 @@
     </div>
   </div>
 
-  <!-- 底部左：队名 / 投手 -->
-  <div class="stack">
-
+  <!-- 左列：队名/投手 -->
   <div class="card">
     <div class="h3row">
       <span class="h3t">队名 / 投手</span>
@@ -571,44 +322,12 @@
     </div>
     <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
     <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
-    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label>
-      <div class="line">
-        <input type="text" id="pitcher" placeholder="未设置" style="flex:1;min-width:0">
-        <button class="mini" id="btnPickPitcher" style="width:44px;flex:none">选</button>
-      </div>
-    </div>
-    <div class="field" style="margin-top:5px"><label>客队徽（空则不显示）</label>
-      <div class="line">
-        <button class="mini" id="logoAwayBtn" style="width:52px">上传</button>
-        <img class="logoPrev" id="logoAwayPrev" style="display:none" alt="">
-        <button class="mini" id="logoAwayClear" style="display:none;width:46px">清除</button>
-      </div>
-      <input type="file" id="logoAwayFile" accept="image/*" hidden>
-    </div>
-    <div class="field" style="margin-top:5px"><label>主队徽（空则不显示）</label>
-      <div class="line">
-        <button class="mini" id="logoHomeBtn" style="width:52px">上传</button>
-        <img class="logoPrev" id="logoHomePrev" style="display:none" alt="">
-        <button class="mini" id="logoHomeClear" style="display:none;width:46px">清除</button>
-      </div>
-      <input type="file" id="logoHomeFile" accept="image/*" hidden>
-    </div>
+    <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label><input type="text" id="pitcher" placeholder="未设置"></div>
   </div>
 
-  </div>
-
-  <!-- 底部右：扫码 / 更多 -->
-  <div class="stack">
-
+  <!-- 右列：扫码/更多 -->
   <div class="card">
     <div class="h3row"><span class="h3t">扫码 / 更多</span></div>
-    <div class="line" style="margin-bottom:6px">
-      <span style="font-size:10px;color:var(--cyan-l);flex:none;white-space:nowrap">年龄</span>
-      <button class="mini ageChip" data-age="U8" style="flex:1">U8</button>
-      <button class="mini ageChip" data-age="U10" style="flex:1">U10</button>
-      <button class="mini ageChip" data-age="U12" style="flex:1">U12</button>
-      <button class="mini ageChip" data-age="other" style="flex:1">其他</button>
-    </div>
     <div id="qrBlock" style="display:none">
       <div id="qrBox" style="text-align:center"></div>
       <div class="line" style="margin-top:6px">
@@ -616,12 +335,10 @@
         <button id="copyUrl" class="mini" style="width:46px">复制</button>
       </div>
     </div>
-    <button id="btnTeamLib" style="width:100%;margin-top:6px">队伍库 · 录入球队队员</button>
-    <button id="btnExport" class="primary" style="width:100%;margin-top:6px">结束比赛 · 导出数据表</button>
     <button id="resetAll" class="warn" style="width:100%;margin-top:6px">清空比赛数据</button>
   </div>
 
-  </div>
+</div>
 
 </div>
 <script src="/qrcode.min.js"></script>
@@ -903,69 +620,8 @@ document.querySelectorAll('[data-key]').forEach((btn) => {
 ['base0', 'base1', 'base2'].forEach((id, i) => {
   $(id).addEventListener('click', () => Sync.toggleBase(i));
 });
-/* ---------- 安打 / 失误：点击弹出选择窗口 ---------- */
-const HIT_OPTS = [
-  ['1B', '一垒安打'],
-  ['2B', '二垒安打'],
-  ['3B', '三垒安打'],
-  ['HR', '全垒打']
-];
-const POS_NAMES = { 1: '投手', 2: '捕手', 3: '一垒手', 4: '二垒手', 5: '三垒手', 6: '游击手', 7: '左外野', 8: '中外野', 9: '右外野' };
-const playModal = $('playModal');
-const pmGrid = $('pmGrid');
-
-function closePlayModal() { playModal.classList.remove('on'); }
-
-function openPlayModal(mode) {
-  const s = Sync.get();
-  const atk = Sync.attackingTeam();
-  const def = Sync.defendingTeam();
-  const idx = s.batterIdx[atk];
-  const batter = s.batters[atk][idx] || ('第' + (idx + 1) + '棒');
-
-  playModal.classList.toggle('hit', mode === 'hit');
-  playModal.classList.toggle('err', mode === 'err');
-  pmGrid.innerHTML = '';
-
-  if (mode === 'hit') {
-    $('pmTitle').textContent = '⚾ 选择安打类型';
-    $('pmSub').textContent = `${s.teams[atk]} 进攻 · 当前打者：${batter}`;
-    HIT_OPTS.forEach(([k, label], i) => {
-      const b = document.createElement('button');
-      b.className = 'mopt' + (i === 0 ? ' primary' : '');
-      b.textContent = label;
-      b.addEventListener('click', () => {
-        Sync.hitWith(k);
-        closePlayModal();
-        flash(label + (label === '全垒打' ? '！得分' : ' +1'));
-      });
-      pmGrid.appendChild(b);
-    });
-  } else {
-    $('pmTitle').textContent = '⚠️ 选择失误位置';
-    $('pmSub').textContent = `${s.teams[def]} 防守 · 记入该队 E`;
-    for (let n = 1; n <= 9; n++) {
-      const b = document.createElement('button');
-      b.className = 'mopt';
-      b.innerHTML = '<b style="font-size:19px">' + n + '</b><br><span style="font-size:10px;opacity:.75">' + POS_NAMES[n] + '</span>';
-      b.addEventListener('click', () => {
-        Sync.errorWith(n);
-        closePlayModal();
-        flash('失误 E' + n + ' +1');
-      });
-      pmGrid.appendChild(b);
-    }
-  }
-  playModal.classList.add('on');
-}
-
-$('btnHit').addEventListener('click', () => openPlayModal('hit'));
-$('btnError').addEventListener('click', () => openPlayModal('error'));
-$('pmCancel').addEventListener('click', closePlayModal);
-playModal.addEventListener('click', (e) => { if (e.target === playModal) closePlayModal(); });
-$('btnHeClear').addEventListener('click', () => {
-  if (confirm('确定清除两队的 H / E 计数？')) Sync.clearHE();
-});
+$('btnHit').addEventListener('click', () => Sync.hit());
+$('btnError').addEventListener('click', () => Sync.error());
 
 /* ---------- 得分录入 ---------- */
 $('teamAway').addEventListener('click', () => { curTeam = 1; render(Sync.get()); });
@@ -1496,6 +1152,34 @@ $('resetAll').addEventListener('click', () => {
   if (confirm('确定清空整场比赛数据？（打序名单会保留）')) Sync.resetAll();
 });
 
+/* ---------- 结束比赛：导出数据表到桌面，并自动清空全部内容 ---------- */
+$('btnExport').addEventListener('click', () => {
+  if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会自动清空所有内容，准备下一场。')) return;
+  fetch(Sync.BASE + '/api/export', { method: 'POST' })
+    .then((r) => r.json())
+    .then((d) => {
+      if (!d.ok) { alert('导出失败：' + (d.error || '未知错误')); return; }
+      flash('已存到桌面');
+      Sync.patch({
+        teams: ['主队', '客队'],
+        logos: ['', ''],
+        matchName: '',
+        orgLogo: '',
+        ageGroup: '',                                  // 清空后回到年龄段选择页
+        scores: [Array(Sync.MAX_INNINGS).fill(''), Array(Sync.MAX_INNINGS).fill('')],
+        he: [[0, 0], [0, 0]],
+        pitcher: '',
+        batters: [Array(9).fill(''), Array(9).fill('')],
+        batterIdx: [0, 0],
+        inning: 1, half: 0, balls: 0, strikes: 0, outs: 0,
+        bases: [false, false, false],
+        playerStats: null,                       // 队员统计清零
+        pitchers: null                           // 投手统计清零
+      });
+    })
+    .catch(() => alert('导出失败：无法连接服务器'));
+});
+
 /* ---------- 结束比赛：下载数据表，并自动清空全部内容 ---------- */
 $('btnExport').addEventListener('click', () => {
   if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会自动清空所有内容，准备下一场。')) return;
@@ -1537,12 +1221,11 @@ $('btnExport').addEventListener('click', () => {
 
 /* ---------- 扫码（本机/公网都显示，方便手机直接扫） ---------- */
 (function initQR() {
-  fetch(Sync.BASE + '/api/info').then((r) => r.json()).then((info) => {
-    // 本机用局域网 IP（手机才连得进）；公网访问直接用当前域名（云端地址无法从服务端得知）
-    const host = location.hostname;
-    const isLocalHost = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host);
-    const url = isLocalHost ? info.controlUrl : location.origin + Sync.BASE + '/';
-    $('lanUrl').value = url;
+  const host = location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1' && host !== '[::1]') return;
+
+  fetch('/api/info').then((r) => r.json()).then((info) => {
+    $('lanUrl').value = info.controlUrl;
     $('qrBlock').style.display = '';
 
     if (!renderQRInto($('qrBox'), url, 120)) {
