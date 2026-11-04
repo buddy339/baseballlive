@@ -703,3 +703,22 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('  手机和电脑需连同一个 WiFi；关闭窗口即停止服务。');
   console.log('');
 });
+
+// 端口被占用时给出友好提示（而不是一坨堆栈）
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.log('');
+    console.log(`  [启动失败] 端口 ${PORT} 已被占用，说明已经有一个服务在运行了。`);
+    console.log('  ------------------------------------------');
+    console.log(`  · 想用现有的服务：直接用浏览器打开 http://localhost:${PORT}/`);
+    console.log(`  · 想换个端口启动：`);
+    console.log(`      PowerShell : $env:PORT=${PORT + 1}; node server.js`);
+    console.log(`      CMD        : set PORT=${PORT + 1} && node server.js`);
+    console.log(`  · 想先关掉占用的进程：`);
+    console.log(`      PowerShell : Get-NetTCPConnection -LocalPort ${PORT} -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`);
+    console.log('  ------------------------------------------');
+    console.log('');
+    process.exit(1);
+  }
+  throw e;
+});
