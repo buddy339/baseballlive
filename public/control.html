@@ -146,6 +146,7 @@
   .batcol-head > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .batcol-head.atk { color: var(--yellow); border-bottom-color: var(--yellow); }
   .batcol-head .ftip { flex: none; }
+  .batcol-head .bclear { width: auto; min-width: 0; min-height: 20px; height: 20px; font-size: 9px; padding: 0 7px; margin-left: auto; flex: none; }
   /* 双列空间紧，行内元素收紧，保证两三字姓名完整可见 */
   .batcols .brow { gap: 4px; }
   .batcols .bno { width: 22px; padding: 0; font-size: 10px; }
@@ -543,11 +544,11 @@
     <div class="tip" id="teamMatchTip" style="display:none"></div>
     <div class="batcols">
       <div class="batcol">
-        <div class="batcol-head" id="batHeadAway"><span id="batNameAway">客队</span><span class="ftip" id="batStateAway"></span></div>
+        <div class="batcol-head" id="batHeadAway"><span id="batNameAway">客队</span><span class="ftip" id="batStateAway"></span><button class="mini bclear" id="batClearAway" title="清空该队全部打序与守备位置">清空</button></div>
         <div id="batterListAway"></div>
       </div>
       <div class="batcol">
-        <div class="batcol-head" id="batHeadHome"><span id="batNameHome">主队</span><span class="ftip" id="batStateHome"></span></div>
+        <div class="batcol-head" id="batHeadHome"><span id="batNameHome">主队</span><span class="ftip" id="batStateHome"></span><button class="mini bclear" id="batClearHome" title="清空该队全部打序与守备位置">清空</button></div>
         <div id="batterListHome"></div>
       </div>
     </div>
@@ -569,8 +570,18 @@
       <span class="h3t">队名 / 投手</span>
       <span class="ftip" id="playerTip">未设置</span>
     </div>
-    <div class="field"><label>客队名</label><input type="text" id="nameAway"></div>
-    <div class="field"><label>主队名</label><input type="text" id="nameHome"></div>
+    <div class="field"><label>客队名</label>
+      <div class="line">
+        <input type="text" id="nameAway" style="flex:1;min-width:0">
+        <button class="mini" id="btnPickAway" style="width:44px;flex:none" title="从队伍库选择队名并自动填名单">选</button>
+      </div>
+    </div>
+    <div class="field"><label>主队名</label>
+      <div class="line">
+        <input type="text" id="nameHome" style="flex:1;min-width:0">
+        <button class="mini" id="btnPickHome" style="width:44px;flex:none" title="从队伍库选择队名并自动填名单">选</button>
+      </div>
+    </div>
     <div class="field" style="margin-top:5px"><label>投手（空则不显示）</label>
       <div class="line">
         <input type="text" id="pitcher" placeholder="未设置" style="flex:1;min-width:0">
@@ -980,6 +991,10 @@ $('prevBatter').addEventListener('click', () => Sync.prevBatter());
 $('nextBatterBtn').addEventListener('click', () => Sync.nextBatter());
 $('addBatter').addEventListener('click', () => Sync.addBatterSlot());
 $('removeBatter').addEventListener('click', () => Sync.removeLastBatter());
+$('batClearAway').addEventListener('click', () => clearBatters(1));
+$('batClearHome').addEventListener('click', () => clearBatters(0));
+$('btnPickAway').addEventListener('click', () => openTeamPick(1));
+$('btnPickHome').addEventListener('click', () => openTeamPick(0));
 
 /* ---------- 队伍库：队名匹配 + 棒次选人 + 拼音首字母搜索 ---------- */
 const AGE_GROUPS = ['U8', 'U10', 'U12', '其他'];
@@ -1087,6 +1102,60 @@ function openPitcherPick() {
   setTimeout(() => { if (pickModal.classList.contains('on')) $('pkSearch').focus(); }, 80);
 }
 
+/* ---------- 队名：从队伍库选择 ---------- */
+function openTeamPick(team) {
+  const names = Object.keys(TeamLib.teams || {});
+  if (!names.length) { flash('队伍库为空，请先在「队伍库」录入或导入'); return; }
+  pickTarget = { mode: 'team', team };
+  $('pkTitle').textContent = `⚾ 选择${team === 1 ? '客' : '主'}队队名`;
+  $('pkSub').textContent = '选中后自动填队名；有名单时询问是否填入打序';
+  $('pkSearch').value = '';
+  renderPickList('');
+  pickModal.classList.add('on');
+  setTimeout(() => { if (pickModal.classList.contains('on')) $('pkSearch').focus(); }, 80);
+}
+
+/** 选中队伍：填队名 + 询问是否用库内名单覆盖打序（含自动补棒数） */
+function applyTeamFromLib(team, name) {
+  Sync.setTeamName(team, name);
+  refreshTeamMatch();
+  const lib = TeamLib.find(name) || [];
+  if (!lib.length) { flash(`队名已设为「${name}」（库中无名单）`); return; }
+  const s = Sync.get();
+  const has = s.batters[team].some((n) => String(n || '').trim());
+  const label = team === 1 ? '客队' : '主队';
+  if (has && !confirm(`要用「${name}」的 ${lib.length} 人名单覆盖${label}当前打序吗？\n（守备位置会一并清空，棒次回到第 1 棒）`)) return;
+  const n = Math.min(lib.length, Sync.MAX_BATTERS);
+  const len = Math.max(s.batters[team].length, n);
+  const batters = s.batters.map((l) => l.slice());
+  const positions = (s.positions || [[], []]).map((l) => (l || []).slice());
+  while (batters[0].length < len) { batters[0].push(''); batters[1].push(''); }
+  while (positions[0].length < len) { positions[0].push(''); positions[1].push(''); }
+  batters[team] = new Array(len).fill('');
+  positions[team] = new Array(len).fill('');
+  lib.slice(0, n).forEach((p, i) => { batters[team][i] = TeamLib.playerLabel(p); });
+  const batterIdx = s.batterIdx.slice();
+  batterIdx[team] = 0;
+  Sync.patch({ batters, positions, batterIdx });
+  flash(`已填入「${name}」${n} 人打序`);
+}
+
+/** 一键清空某队打序 + 守备位置，棒次回第 1 棒 */
+function clearBatters(team) {
+  const s = Sync.get();
+  const label = `${s.teams[team] || (team === 1 ? '客队' : '主队')}（${team === 1 ? '客' : '主'}）`;
+  if (!confirm(`清空「${label}」的全部打序和守备位置？\n（棒次回到第 1 棒，比赛统计数据不受影响）`)) return;
+  const len = s.batters[team].length;
+  const batters = s.batters.map((l) => l.slice());
+  const positions = (s.positions || [[], []]).map((l) => (l || []).slice());
+  batters[team] = new Array(len).fill('');
+  positions[team] = new Array(len).fill('');
+  const batterIdx = s.batterIdx.slice();
+  batterIdx[team] = 0;
+  Sync.patch({ batters, positions, batterIdx });
+  flash(`已清空${label}打序`);
+}
+
 function renderPickList(q) {
   if (!pickTarget) return;
   const s = Sync.get();
@@ -1096,6 +1165,15 @@ function renderPickList(q) {
   if (pickTarget.mode === 'pitcher') {
     list = filterPlayers(pitcherCandidates(), q);
     emptyHint = '两队名单为空，请先填打序或队伍库';
+  } else if (pickTarget.mode === 'team') {
+    const qq = String(q || '').trim().toLowerCase();
+    list = Object.keys(TeamLib.teams || {})
+      .filter((name) => !qq || name.toLowerCase().includes(qq))
+      .map((name) => {
+        const t = TeamLib.teams[name] || {};
+        return { name, no: '', group: t.group || '', count: (t.players || []).length };
+      });
+    emptyHint = qq ? '没有匹配「' + q + '」的队伍' : '队伍库为空';
   } else {
     const { team, pos } = pickTarget;
     const used = new Set(s.batters[team].map((n) => String(n || '').trim()).filter(Boolean));
@@ -1110,10 +1188,31 @@ function renderPickList(q) {
   if (!list.length) $('pkEmpty').textContent = emptyHint;
 
   list.forEach((p) => {
-    const pl = TeamLib.normPlayer(p);
-    const label = TeamLib.playerLabel(pl);
     const b = document.createElement('button');
     b.className = 'pkopt';
+    if (pickTarget.mode === 'team') {
+      // 队伍项：队名 + 组别徽标 + 人数
+      if (p.group) {
+        const badge = document.createElement('span');
+        badge.className = 'pkno';
+        badge.textContent = p.group;
+        b.appendChild(badge);
+      }
+      b.appendChild(document.createTextNode(p.name));
+      const cnt = document.createElement('span');
+      cnt.style.cssText = 'margin-left:auto;font-size:10px;opacity:.65';
+      cnt.textContent = p.count ? p.count + '人' : '无名单';
+      b.appendChild(cnt);
+      b.addEventListener('click', () => {
+        const { team } = pickTarget;
+        closePickModal();
+        applyTeamFromLib(team, p.name);
+      });
+      box.appendChild(b);
+      return;
+    }
+    const pl = TeamLib.normPlayer(p);
+    const label = TeamLib.playerLabel(pl);
     if (pl.no) {
       const badge = document.createElement('span');
       badge.className = 'pkno';
