@@ -77,22 +77,22 @@
   #b3 { top: 24px; left: 0; }
   #b1 { top: 24px; left: 54px; }
 
-  #hint { position: absolute; top: 8px; right: 12px; font-size: 11px; color: rgba(200, 240, 248, .45); }
+  #hint { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(200, 240, 248, .45); }
   #hint.off { display: none; }
 
   /* ============ 右上：主办方 Logo + 比赛名称 ============ */
   #event {
-    position: absolute; top: 24px; right: 32px;
-    padding: 9px 12px;
-    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    position: absolute; top: 12px; right: 12px;
+    padding: 8px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
     max-width: 700px;                            /* 实际宽度由 JS 对齐到记分板 */
   }
   #event img {
-    max-width: 134px; max-height: 118px; object-fit: contain;
+    max-width: 114px; max-height: 100px; object-fit: contain;
     background: #fff; border-radius: 6px; padding: 4px;
   }
   #eventName {
-    color: #ffe14d; font-size: 14.5px; font-weight: bold; text-align: center;
+    color: #ffe14d; font-size: 14px; font-weight: bold; text-align: center;
     line-height: 1.38; white-space: pre-line;
   }
 </style>
