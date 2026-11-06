@@ -497,10 +497,14 @@ function exportCSV(gameId, state) {
   const fname = `比赛数据_${vsPart}_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.csv`;
   const csv = '﻿' + lines.join('\r\n');   // BOM 让 Excel 正确识别中文
 
-  // 本机跑服务时仍顺手存一份到桌面；云端没有桌面则跳过，改由浏览器下载
+  // 本机跑服务时顺手存一份到桌面「比赛数据」文件夹；云端没有桌面则跳过，改由浏览器下载
   try {
     const desktop = path.join(os.homedir(), 'Desktop');
-    if (fs.existsSync(desktop)) fs.writeFileSync(path.join(desktop, fname), csv, 'utf8');
+    if (fs.existsSync(desktop)) {
+      const dir = path.join(desktop, '比赛数据');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, fname), csv, 'utf8');
+    }
   } catch (e) { /* 无桌面目录（云端）忽略 */ }
 
   return { fname, csv };
