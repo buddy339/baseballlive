@@ -83,16 +83,16 @@
   /* ============ 右上：主办方 Logo + 比赛名称 ============ */
   #event {
     position: absolute; top: 32px; right: 32px;
-    padding: 13px 18px;
-    display: flex; flex-direction: column; align-items: center; gap: 11px;
-    max-width: 700px;
+    padding: 11px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    max-width: 700px;                            /* 实际宽度由 JS 对齐到记分板 */
   }
   #event img {
-    max-width: 250px; max-height: 230px; object-fit: contain;
+    max-width: 200px; max-height: 185px; object-fit: contain;
     background: #fff; border-radius: 7px; padding: 5px;
   }
   #eventName {
-    color: #ffe14d; font-size: 19px; font-weight: bold; text-align: center;
+    color: #ffe14d; font-size: 17px; font-weight: bold; text-align: center;
     line-height: 1.45; white-space: pre-line;
   }
 </style>
@@ -272,6 +272,8 @@ function render(s) {
   const evLogo = document.getElementById('eventLogo');
   const evName = document.getElementById('eventName');
   ev.style.display = (s.orgLogo || s.matchName) ? '' : 'none';
+  // 宽度与左上记分板对齐（记分板宽度随队名长度变化，每次渲染同步一次）
+  ev.style.width = document.getElementById('scoreboard').offsetWidth + 'px';
   evLogo.style.display = s.orgLogo ? '' : 'none';
   if (s.orgLogo && evLogo.getAttribute('src') !== s.orgLogo) evLogo.src = s.orgLogo;
   evName.style.display = s.matchName ? '' : 'none';

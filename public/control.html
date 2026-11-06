@@ -1597,7 +1597,7 @@ $('resetAll').addEventListener('click', () => {
 
 /* ---------- 结束比赛：下载数据表，并自动清空全部内容 ---------- */
 $('btnExport').addEventListener('click', () => {
-  if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会自动清空所有内容，准备下一场。')) return;
+  if (!confirm('结束本场比赛并导出两队队员数据表？\n导出后会清空比分和名单准备下一场（主办方Logo、赛事名称会保留）。')) return;
   fetch(Sync.BASE + '/api/export', { method: 'POST' })
     .then((r) => r.json())
     .then((d) => {
@@ -1614,8 +1614,7 @@ $('btnExport').addEventListener('click', () => {
       Sync.patch({
         teams: ['主队', '客队'],
         logos: ['', ''],
-        matchName: '',
-        orgLogo: '',
+        // matchName、orgLogo 保留：同一场赛事连打几场不用重填
         ageGroup: '',                                  // 清空后回到年龄段选择页
         scores: [Array(Sync.MAX_INNINGS).fill(''), Array(Sync.MAX_INNINGS).fill('')],
         he: [[0, 0], [0, 0]],
