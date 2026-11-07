@@ -55,7 +55,13 @@ function defaultState() {
     errors: { 0: {}, 1: {} },                                    // 失误位置分布 { 队索引: { 位置号: 次数 } }
     outLog: [],                                                  // 最近出局记录（最多 40 条，服务端追加）
     outStats: { 封杀: 0, 触杀: 0, 接杀: 0 },                       // 出局方式统计
-    outPos: {}                                                   // 守备参与位置统计 { 位置号: 次数 }
+    outPos: {},                                                  // 守备参与位置统计 { 位置号: 次数 }
+    stealStats: [                                                // [主队, 客队] 盗垒统计
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 },
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 }
+    ],
+    stealLog: [],                                                // 盗垒记录（最多 40 条）
+    stealFailPos: [{}, {}]                                       // 盗垒失败阻杀位置 { 防守队索引: { 位置号: 次数 } }
   };
 }
 
@@ -274,6 +280,29 @@ function mergePatch(state, patch) {
   if (!Array.isArray(state.outLog)) state.outLog = [];
   if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
 
+  // 盗垒统计：成功/失败 + 上各垒次数；重置比赛时 patch.stealStats=null 重建
+  if (!Array.isArray(state.stealStats) || state.stealStats.length !== 2) {
+    state.stealStats = [
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 },
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 }
+    ];
+  }
+  state.stealStats = state.stealStats.map((t) => {
+    const x = (t && typeof t === 'object') ? t : {};
+    return {
+      ok: Math.max(0, x.ok | 0), fail: Math.max(0, x.fail | 0),
+      to2: Math.max(0, x.to2 | 0), to3: Math.max(0, x.to3 | 0), toH: Math.max(0, x.toH | 0)
+    };
+  });
+  if (!Array.isArray(state.stealLog)) state.stealLog = [];
+  if (state.stealLog.length > OUT_LOG_MAX) state.stealLog = state.stealLog.slice(-OUT_LOG_MAX);
+  if (!Array.isArray(state.stealFailPos) || state.stealFailPos.length !== 2) state.stealFailPos = [{}, {}];
+  [0, 1].forEach((t) => {
+    if (!state.stealFailPos[t] || typeof state.stealFailPos[t] !== 'object' || Array.isArray(state.stealFailPos[t])) {
+      state.stealFailPos[t] = {};
+    }
+  });
+
   // ============ 事件归因到打者（在自动结算之前判定）============
   const prevAtk = prev.half === 0 ? 1 : 0;
   const prevCol = Math.min(MAX_INNINGS - 1, Math.max(0, prev.inning - 1));
@@ -344,6 +373,37 @@ function mergePatch(state, patch) {
       outs: Math.min(OUTS_LIMIT, (state.outs | 0))
     });
     if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
+  }
+
+  // 盗垒：成功（上二/三/本垒，盗本垒记 1 分）/ 失败（被阻杀，记一出局，打者与球数不变）
+  if (play && play.type === 'steal') {
+    const atk = prev.half === 0 ? 1 : 0;
+    const def = prev.half === 0 ? 0 : 1;
+    const st = state.stealStats[atk];
+    if (play.ok) {
+      const to = play.to === 'H' ? 'H' : (play.to === '3' ? '3' : '2');
+      st.ok += 1;
+      if (to === 'H') st.toH += 1;
+      else if (to === '3') st.to3 += 1;
+      else st.to2 += 1;
+      state.stealLog.push({
+        inning: prev.inning, half: prev.half, team: atk,
+        ok: true, to, seq: [], runs: Math.max(0, play.runs | 0)
+      });
+    } else {
+      const seq = (Array.isArray(play.seq) ? play.seq : [])
+        .map((v) => v | 0).filter((p) => p >= 1 && p <= 9).slice(0, 4);
+      st.fail += 1;
+      // 阻杀记在防守方对应守备位置（同一位置一次只记一次）
+      seq.filter((p, i) => seq.indexOf(p) === i).forEach((p) => {
+        state.stealFailPos[def][p] = (state.stealFailPos[def][p] | 0) + 1;
+      });
+      state.stealLog.push({
+        inning: prev.inning, half: prev.half, team: atk,
+        ok: false, to: '', seq, runs: 0
+      });
+    }
+    if (state.stealLog.length > OUT_LOG_MAX) state.stealLog = state.stealLog.slice(-OUT_LOG_MAX);
   }
 
   // ============ 球数自动结算（受 autoAdvance 开关统一控制）============
@@ -490,6 +550,8 @@ function exportCSV(gameId, state) {
   lines.push('');
 
   // 客队在上、主队在下
+  const ZERO_STEAL = { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 };
+  const stealOf = (team) => (state.stealStats && state.stealStats[team]) || ZERO_STEAL;
   [1, 0].forEach((r) => {
     const runs = state.scores[r].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
     lines.push(`【${esc(state.teams[r])}】 总得分 R=${runs}  安打 H=${state.he[r][0] | 0}  失误 E=${state.he[r][1] | 0}`);
@@ -507,6 +569,16 @@ function exportCSV(gameId, state) {
     const errs = state.errors && state.errors[r] ? state.errors[r] : {};
     const parts = Object.keys(errs).sort((a, b) => a - b).map((pos) => `E${pos}×${errs[pos] | 0}`);
     if (parts.length) lines.push('失误明细,' + parts.join(', '));
+
+    // 盗垒（该队进攻时）+ 该队防守时的阻杀位置
+    const sst = stealOf(r);
+    if (sst.ok + sst.fail > 0) {
+      const rate = (sst.ok + sst.fail) > 0 ? (sst.ok / (sst.ok + sst.fail) * 100).toFixed(1) + '%' : '-';
+      lines.push(`盗垒,成功 ${sst.ok} · 失败 ${sst.fail} · 成功率 ${rate}（上二垒 ${sst.to2} / 上三垒 ${sst.to3} / 盗本垒 ${sst.toH}）`);
+    }
+    const sfp = (state.stealFailPos && state.stealFailPos[r]) || {};
+    const sfpParts = Object.keys(sfp).sort((a, b) => a - b).map((p) => `${p}${posNameOf(p)}×${sfp[p] | 0}`);
+    if (sfpParts.length) lines.push('阻杀位置,' + sfpParts.join(', '));
     lines.push('');
   });
 
@@ -544,6 +616,26 @@ function exportCSV(gameId, state) {
     const posParts = Object.keys(outPos).sort((a, b) => a - b)
       .map((p) => `${p}${posNameOf(p)}×${outPos[p] | 0}`);
     if (posParts.length) lines.push('守备参与,' + posParts.join(', '));
+    lines.push('');
+  }
+
+  // 盗垒明细（逐次列出：局数 / 进攻队 / 成功或失败 / 垒位 / 阻杀位置）
+  const stealLog = Array.isArray(state.stealLog) ? state.stealLog : [];
+  if (stealLog.length) {
+    const TO_NAME = { 2: '二垒', 3: '三垒', H: '本垒' };
+    lines.push('【盗垒明细】');
+    lines.push('局,半局,进攻队,结果,垒位,阻杀位置');
+    stealLog.forEach((e) => {
+      const half = (e && e.half === 1) ? '下' : '上';
+      const teamName = (state.teams && state.teams[e.team | 0]) || '';
+      if (e && e.ok) {
+        lines.push([e.inning | 0, half, esc(teamName), '成功', TO_NAME[e.to] || '', ''].join(','));
+      } else {
+        const seq = Array.isArray(e && e.seq) ? e.seq : [];
+        const posTxt = seq.map((p) => `${p}${posNameOf(p)}`).join('→');
+        lines.push([(e && e.inning) | 0, half, esc(teamName), '失败', '', posTxt].join(','));
+      }
+    });
     lines.push('');
   }
 

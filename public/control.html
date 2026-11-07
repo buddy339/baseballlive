@@ -250,49 +250,52 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
-  /* ---------- 出局方式弹窗：守备位置多选 ---------- */
-  #outModal {
+  /* ---------- 弹窗外壳（出局方式 / 盗垒 共用） ---------- */
+  .pop {
     position: fixed; inset: 0; z-index: 64;
     display: none; align-items: center; justify-content: center;
     background: rgba(0, 12, 18, .7);
   }
-  #outModal.on { display: flex; }
-  #outModal .mcard {
+  .pop.on { display: flex; }
+  .pop .mcard {
     width: min(90vw, 330px);
     background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
     padding: 13px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .6);
   }
-  #outModal .mtitle { text-align: center; font-size: 16px; font-weight: bold; color: var(--yellow); letter-spacing: 1px; }
-  #outModal .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; line-height: 1.5; }
-  #outModal .omseq {
+  .pop .mtitle { text-align: center; font-size: 16px; font-weight: bold; color: var(--yellow); letter-spacing: 1px; }
+  .pop .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; line-height: 1.5; }
+  .pop .omseq {
     display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
     min-height: 32px; padding: 4px 7px; margin-bottom: 8px;
     background: #071820; border: 1px dashed rgba(47, 212, 232, .45); border-radius: 8px;
   }
-  #outModal .omempty { font-size: 11px; color: var(--cyan-l); opacity: .5; }
-  #outModal .omchip {
+  .pop .omempty { font-size: 11px; color: var(--cyan-l); opacity: .5; }
+  .pop .omchip {
     display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px;
     font-size: 12px; font-weight: bold; color: #06222e; background: var(--yellow);
     border-radius: 6px; cursor: pointer;
   }
-  #outModal .omchip i { font-style: normal; font-size: 9px; opacity: .7; }
-  #outModal .omarrow { color: var(--yellow); font-size: 11px; }
-  #outModal .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  #outModal .mopt {
+  .pop .omchip i { font-style: normal; font-size: 9px; opacity: .7; }
+  .pop .omarrow { color: var(--yellow); font-size: 11px; }
+  .pop .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pop .mopt {
     position: relative; min-height: 48px; font-size: 14px; line-height: 1.2;
     border-radius: 10px; background: #123240; color: var(--cyan-l);
     border: 1.5px solid var(--cyan);
   }
-  #outModal .mopt b { font-size: 15px; }
-  #outModal .mopt small { display: block; font-size: 9px; opacity: .7; margin-top: 1px; }
-  #outModal .mopt.on { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
-  #outModal .mopt .ord {
+  .pop .mopt b { font-size: 15px; }
+  .pop .mopt small { display: block; font-size: 9px; opacity: .7; margin-top: 1px; }
+  .pop .mopt.on { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
+  .pop .mopt:active { background: var(--cyan); color: #06222e; }
+  .pop .mopt.tall { min-height: 62px; }
+  .pop .mopt.tall b { font-size: 17px; }
+  .pop .mopt .ord {
     position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 3px;
     border-radius: 9px; background: var(--yellow); color: #06222e;
     font-size: 10px; font-weight: bold; line-height: 17px; text-align: center;
   }
-  #outModal .omhint { margin-top: 7px; font-size: 10px; line-height: 1.5; text-align: center; color: var(--cyan-l); opacity: .7; }
-  #outModal #omOk { min-height: 38px; }
+  .pop .omhint { margin-top: 7px; font-size: 10px; line-height: 1.5; text-align: center; color: var(--cyan-l); opacity: .7; }
+  .pop .okbtn { min-height: 38px; }
 
   /* ---------- 顶部轻提示（替代按钮文字闪现） ---------- */
   #toast {
@@ -454,7 +457,7 @@
 </div>
 
 <!-- 出局方式弹窗：先选方式（封杀/触杀/接杀），再按顺序多选守备位置 1~9 -->
-<div id="outModal">
+<div id="outModal" class="pop">
   <div class="mcard">
     <div class="mtitle" id="omTitle">封杀</div>
     <div class="msub" id="omSub"></div>
@@ -466,9 +469,34 @@
     </div>
     <div class="grid2" style="margin-top:5px">
       <button class="mini" id="omCancel">取消</button>
-      <button class="primary" id="omOk">确定 · 记一出局</button>
+      <button class="primary okbtn" id="omOk">确定 · 记一出局</button>
     </div>
     <div class="omhint" id="omHint"></div>
+  </div>
+</div>
+
+<!-- 盗垒弹窗：成功（二垒/三垒/本垒）单选取即生效；失败（阻杀位置 1~9）多选后确认 -->
+<div id="stealModal" class="pop">
+  <div class="mcard">
+    <div class="mtitle" id="smTitle">盗垒成功</div>
+    <div class="msub" id="smSub"></div>
+
+    <div id="smOkBody" class="mgrid"></div>
+
+    <div id="smFailBody" style="display:none">
+      <div class="omseq" id="smSeq"></div>
+      <div class="mgrid" id="smGrid"></div>
+      <div class="grid2" style="margin-top:8px">
+        <button class="mini" id="smUndo">⌫ 撤销一位</button>
+        <button class="mini" id="smClear">重选</button>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:8px">
+      <button class="mini" id="smCancel">取消</button>
+      <button class="primary okbtn" id="smOk">确定 · 记一出局</button>
+    </div>
+    <div class="omhint" id="smHint"></div>
   </div>
 </div>
 
@@ -634,6 +662,18 @@
       <button id="btnError">失误 +1</button>
     </div>
     <button id="btnHeClear" class="mini" style="width:100%;margin-top:5px">清除 H / E</button>
+  </div>
+
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">盗垒</span>
+      <span class="ftip" id="stealTip">成功 0 · 失败 0</span>
+    </div>
+    <div class="grid2">
+      <button id="btnStealOk" class="primary">盗垒成功</button>
+      <button id="btnStealFail" class="warn">盗垒失败</button>
+    </div>
+    <div class="outlast" id="stealLast">最近：—</div>
   </div>
 
   </div>
@@ -915,6 +955,15 @@ function render(s) {
   $('outLast').textContent = olast
     ? `最近：${olast.kind} ${olast.seq.join('-')}｜${olast.inning}局${olast.half === 0 ? '上' : '下'} ${olast.batter || ''}`
     : '最近出局：—';
+  // 盗垒卡片：当前进攻方累计 + 最近一次
+  const sst = (s.stealStats && s.stealStats[atk]) || { ok: 0, fail: 0 };
+  $('stealTip').textContent = `成功 ${sst.ok} · 失败 ${sst.fail}`;
+  const slog = s.stealLog || [];
+  const slast = slog.length ? slog[slog.length - 1] : null;
+  $('stealLast').textContent = slast
+    ? `最近：${slast.ok ? '成功上' + (TO_NAME[slast.to] || '') : '失败·' + (slast.seq || []).map((p) => POS_ABBR[p] || p).join('传')}`
+      + `｜${slast.inning}局${slast.half === 0 ? '上' : '下'}`
+    : '最近：—';
   $('autoSwitch').textContent = `自动:${s.autoAdvance ? '开' : '关'}`;
   $('autoSwitch').classList.toggle('sel', !!s.autoAdvance);
 
@@ -1223,6 +1272,174 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Backspace') { outSeq.pop(); renderOutModal(); e.preventDefault(); }
   else if (e.key === 'Enter') { commitOut(); e.preventDefault(); }
   else if (e.key === 'Escape') { closeOutModal(); }
+});
+
+/* ---------- 盗垒：成功（二垒/三垒/本垒）/ 失败（阻杀位置多选） ---------- */
+const stealModal = $('stealModal');
+const TO_NAME = { 2: '二垒', 3: '三垒', H: '本垒' };
+let smMode = 'ok';       // 'ok' 成功（单选即生效）| 'fail' 失败（多选确认）
+let smSeq = [];
+
+function closeStealModal() { stealModal.classList.remove('on'); }
+
+/** 当前垒包文字：● 有人 ○ 空垒 */
+function basesBrief() {
+  const b = Sync.get().bases || [false, false, false];
+  return `一垒 ${b[0] ? '●' : '○'} 二垒 ${b[1] ? '●' : '○'} 三垒 ${b[2] ? '●' : '○'}`;
+}
+
+function openStealOk() {
+  const s = Sync.get();
+  const atk = s.half === 0 ? 1 : 0;
+  smMode = 'ok';
+  smSeq = [];
+  $('smTitle').textContent = '盗垒成功';
+  $('smSub').textContent = `${s.teams[atk]} 进攻 · ${s.inning}局${s.half === 0 ? '上' : '下'} · 点垒位即生效`;
+  $('smOkBody').style.display = '';
+  $('smFailBody').style.display = 'none';
+  $('smOk').style.display = 'none';
+
+  const body = $('smOkBody');
+  body.innerHTML = '';
+  [['2', '二垒', '点亮二垒 · 一垒熄灭'], ['3', '三垒', '点亮三垒 · 二垒熄灭'], ['H', '本垒', '得分 +1 · 三垒熄灭']]
+    .forEach(([to, label, tip]) => {
+      const b = document.createElement('button');
+      b.className = 'mopt tall';
+      b.dataset.to = to;
+      b.innerHTML = `<b>${label}</b><small>${tip}</small>`;
+      b.addEventListener('click', () => doStealOk(to));
+      body.appendChild(b);
+    });
+
+  $('smHint').textContent = `当前：${basesBrief()}｜键盘 2 二垒 · 3 三垒 · 0 本垒`;
+  stealModal.classList.add('on');
+}
+
+function openStealFail() {
+  const s = Sync.get();
+  const atk = s.half === 0 ? 1 : 0;
+  const def = s.half === 0 ? 0 : 1;
+  if ((s.outs | 0) >= 3) { flash('本局已 3 出局，请先换半局'); return; }
+  smMode = 'fail';
+  smSeq = [];
+  $('smTitle').textContent = '盗垒失败 · 阻杀';
+  $('smSub').textContent = `${s.teams[def] || '防守方'} 防守 · 按传球顺序点位置（可多选）`;
+  $('smOkBody').style.display = 'none';
+  $('smFailBody').style.display = '';
+  $('smOk').style.display = '';
+
+  const grid = $('smGrid');
+  if (!grid.children.length) {
+    for (let n = 1; n <= 9; n++) {
+      const b = document.createElement('button');
+      b.className = 'mopt';
+      b.dataset.pos = String(n);
+      b.innerHTML = `<b>${n}</b><small>${POS_NAMES[n]}</small>`;
+      b.addEventListener('click', () => toggleSmPos(n));
+      grid.appendChild(b);
+    }
+  }
+  renderSmFail();
+  stealModal.classList.add('on');
+}
+
+function toggleSmPos(n) {
+  const at = smSeq.indexOf(n);
+  if (at >= 0) smSeq.splice(at, 1); else smSeq.push(n);
+  renderSmFail();
+}
+
+function renderSmFail() {
+  const s = Sync.get();
+  const seqBox = $('smSeq');
+  seqBox.innerHTML = '';
+  if (!smSeq.length) {
+    const e = document.createElement('span');
+    e.className = 'omempty';
+    e.textContent = '尚未选择阻杀位置（可多选，按传球顺序点）';
+    seqBox.appendChild(e);
+  } else {
+    smSeq.forEach((n, i) => {
+      if (i) {
+        const a = document.createElement('span');
+        a.className = 'omarrow';
+        a.textContent = '→';
+        seqBox.appendChild(a);
+      }
+      const c = document.createElement('span');
+      c.className = 'omchip';
+      c.title = '点此删除该位置';
+      c.innerHTML = `${n}<i>${POS_ABBR[n] || ''}</i>`;
+      c.addEventListener('click', () => { smSeq.splice(i, 1); renderSmFail(); });
+      seqBox.appendChild(c);
+    });
+  }
+  [...$('smGrid').children].forEach((b) => {
+    const n = Number(b.dataset.pos);
+    const at = smSeq.indexOf(n);
+    b.classList.toggle('on', at >= 0);
+    const old = b.querySelector('.ord');
+    if (old) old.remove();
+    if (at >= 0) {
+      const badge = document.createElement('span');
+      badge.className = 'ord';
+      badge.textContent = String(at + 1);
+      b.appendChild(badge);
+    }
+  });
+  const nextOuts = Math.min(3, (s.outs | 0) + 1);
+  $('smHint').textContent = smSeq.length
+    ? `${smSeq.map((n) => POS_NAMES[n]).join(' → ')} · 阻杀｜出局 ${s.outs | 0} → ${nextOuts}`
+    : '盗垒失败 = 跑者被阻杀出局，打者继续打击（球数不变）';
+  $('smOk').disabled = !smSeq.length;
+  $('smOk').textContent = smSeq.length ? '确定 · 记一出局' : '请先选阻杀位置';
+}
+
+function doStealOk(to) {
+  const s = Sync.get();
+  const atk = s.half === 0 ? 1 : 0;
+  Sync.stealOk(to);
+  closeStealModal();
+  const label = to === 'H' ? '盗本垒 · 得 1 分' : `盗上${TO_NAME[to]}`;
+  $('stealLast').textContent = `最近：${label}｜${s.inning}局${s.half === 0 ? '上' : '下'} ${s.teams[atk] || ''}`;
+  flash(label);
+}
+
+function doStealFail() {
+  if (!smSeq.length) { flash('请先选择阻杀位置（可多选）'); return; }
+  const s = Sync.get();
+  const atk = s.half === 0 ? 1 : 0;
+  const before = s.outs | 0;
+  const txt = smSeq.map((n) => POS_ABBR[n] || n).join('传');
+  Sync.stealFail(smSeq.slice());
+  closeStealModal();
+  $('stealLast').textContent = `最近：失败·${txt}｜${s.inning}局${s.half === 0 ? '上' : '下'}`;
+  const after = Math.min(3, before + 1);
+  flash(`盗垒失败 · ${txt} · 出局 ${after}/3` + (after === 3 ? ' · 三出局，换半局' : ''));
+}
+
+$('btnStealOk').addEventListener('click', openStealOk);
+$('btnStealFail').addEventListener('click', openStealFail);
+$('smOk').addEventListener('click', doStealFail);
+$('smCancel').addEventListener('click', closeStealModal);
+$('smUndo').addEventListener('click', () => { smSeq.pop(); renderSmFail(); });
+$('smClear').addEventListener('click', () => { smSeq = []; renderSmFail(); });
+stealModal.addEventListener('click', (e) => { if (e.target === stealModal) closeStealModal(); });
+
+/* 盗垒弹窗键盘：失败模式 1~9 选位置 / Backspace / Enter；成功模式 2、3、0 直接选垒 */
+document.addEventListener('keydown', (e) => {
+  if (!stealModal.classList.contains('on')) return;
+  if (smMode === 'ok') {
+    if (e.key === '2') { doStealOk('2'); e.preventDefault(); }
+    else if (e.key === '3') { doStealOk('3'); e.preventDefault(); }
+    else if (e.key === '0' || e.key === 'h' || e.key === 'H') { doStealOk('H'); e.preventDefault(); }
+    else if (e.key === 'Escape') closeStealModal();
+    return;
+  }
+  if (e.key >= '1' && e.key <= '9') { toggleSmPos(Number(e.key)); e.preventDefault(); }
+  else if (e.key === 'Backspace') { smSeq.pop(); renderSmFail(); e.preventDefault(); }
+  else if (e.key === 'Enter') { doStealFail(); e.preventDefault(); }
+  else if (e.key === 'Escape') closeStealModal();
 });
 
 /* ---------- 得分录入 ---------- */
@@ -1877,7 +2094,10 @@ $('btnExport').addEventListener('click', () => {
         errors: null,                            // 失误位置统计清零
         outLog: [],                              // 出局记录清空
         outStats: null,                          // 出局方式统计清零
-        outPos: null                             // 守备参与位置统计清零
+        outPos: null,                            // 守备参与位置统计清零
+        stealStats: null,                        // 盗垒统计清零
+        stealLog: [],                            // 盗垒记录清空
+        stealFailPos: null                       // 阻杀位置统计清零
       });
     })
     .catch(() => alert('导出失败：无法连接服务器'));

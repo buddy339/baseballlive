@@ -31,7 +31,12 @@
     errors: { 0: {}, 1: {} },                // 失误位置分布 { 队索引: { 守备位置号: 次数 } }
     outLog: [],                               // 最近出局记录（服务端追加，最多 40 条）
     outStats: { 封杀: 0, 触杀: 0, 接杀: 0 },   // 出局方式统计
-    outPos: {}                                // 守备参与位置统计 { 位置号: 次数 }
+    outPos: {},                               // 守备参与位置统计 { 位置号: 次数 }
+    stealStats: [                             // [主队, 客队] 盗垒统计
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 },
+      { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 }
+    ],
+    stealLog: []                              // 盗垒记录（服务端追加，最多 40 条）
   };
 
   /* 出局方式（守备位置序列：1 投手 … 9 右外野） */
@@ -244,6 +249,43 @@
     };
   }
 
+  /**
+   * 盗垒成功：to = '2' 上二垒 / '3' 上三垒 / 'H' 盗回本垒（得 1 分）
+   * 跑者离开原垒：上二垒清空一垒、上三垒清空二垒、盗本垒清空三垒
+   */
+  function simulateStealOk(to) {
+    const bases = cloneBases();
+    const scores = cloneScores();
+    const atk = attackingTeam();
+    const col = currentCol();
+    let runs = 0;
+    if (to === 'H') {
+      bases[2] = false;
+      runs = 1;
+    } else if (to === '3') {
+      bases[2] = true;
+      bases[1] = false;
+    } else {
+      bases[1] = true;
+      bases[0] = false;
+    }
+    if (runs > 0) {
+      scores[atk][col] = String((parseInt(scores[atk][col], 10) || 0) + runs);
+    }
+    return { bases, scores, play: { type: 'steal', ok: true, to: to === 'H' ? 'H' : (to === '3' ? '3' : '2'), runs } };
+  }
+
+  /**
+   * 盗垒失败（被阻杀）：记一出局
+   * 与"击球出局"不同：打者仍在打击，棒次不动、B/S 不清零、不计打数
+   */
+  function simulateStealFail(seq) {
+    return {
+      outs: Math.min(OUTS_LIMIT, (state.outs | 0) + 1),
+      play: { type: 'steal', ok: false, seq: seq.slice(0, 4) }
+    };
+  }
+
   /* ---- 便捷操作方法 ---- */  const api = {
     MAX_INNINGS,
     COUNTS,
@@ -408,6 +450,17 @@
     },
     OUT_KINDS,
 
+    /** 盗垒成功：'2' 二垒 / '3' 三垒 / 'H' 本垒（得分 +1） */
+    stealOk(to) {
+      const t = to === 'H' ? 'H' : (to === '3' ? '3' : '2');
+      patch(simulateStealOk(t));
+    },
+    /** 盗垒失败：阻杀守备位置序列，出局 +1（打者与球数不变） */
+    stealFail(seq) {
+      const s = (Array.isArray(seq) ? seq : []).map((v) => v | 0).filter((p) => p >= 1 && p <= 9);
+      patch(simulateStealFail(s));
+    },
+
     /** 安打：进攻方 H +1 并推进垒包；失误：防守方 E +1 */
     hit() { patch(simulateHit()); },
     error() { patch(simulateError()); },
@@ -432,7 +485,9 @@
         errors: null,                                  // 失误位置统计一并清零
         outLog: [],                                    // 出局记录一并清空
         outStats: null,                                // 出局方式统计一并清零
-        outPos: null                                   // 守备参与位置统计一并清零
+        outPos: null,                                  // 守备参与位置统计一并清零
+        stealStats: null,                              // 盗垒统计一并清零
+        stealLog: []                                   // 盗垒记录一并清空
       });
     }
   };
