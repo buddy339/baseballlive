@@ -487,7 +487,8 @@
         outStats: null,                                // 出局方式统计一并清零
         outPos: null,                                  // 守备参与位置统计一并清零
         stealStats: null,                              // 盗垒统计一并清零
-        stealLog: []                                   // 盗垒记录一并清空
+        stealLog: [],                                  // 盗垒记录一并清空
+        stealFailPos: null                             // 阻杀位置统计一并清零
       });
     }
   };
