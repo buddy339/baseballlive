@@ -1192,11 +1192,17 @@ function toggleOutPos(n) {
 
 function commitOut() {
   if (!outSeq.length) { flash('请先选择守备位置（可多选）'); return; }
+  const s0 = Sync.get();
+  const atk = s0.half === 0 ? 1 : 0;
+  const batter = s0.batters[atk][s0.batterIdx[atk]] || '';
   const seq = outSeq.slice();
   const kind = outKind;
-  const before = Sync.get().outs | 0;
+  const before = s0.outs | 0;
   Sync.outWith(kind, seq);
   closeOutModal();
+  // 立即回显（不依赖推送，断网时也能看到刚记的一笔）
+  $('outLast').textContent =
+    `最近：${outShort(kind, seq)}｜${s0.inning}局${s0.half === 0 ? '上' : '下'} ${batter}`;
   const txt = `${outShort(kind, seq)} · 出局 ${Math.min(3, before + 1)}/3`;
   flash(txt + (Math.min(3, before + 1) === 3 ? ' · 三出局，换半局' : ''));
 }
