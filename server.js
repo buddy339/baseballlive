@@ -278,8 +278,21 @@ function mergePatch(state, patch) {
       const b = state.pstats[t][nm];
       state.pstats[t][nm] = {
         ab: b.ab | 0, h: b.h | 0, bb: b.bb | 0, k: b.k | 0, fo: b.fo | 0, rbi: b.rbi | 0,
-        h1: b.h1 | 0, h2: b.h2 | 0, h3: b.h3 | 0, hr: b.hr | 0
+        h1: b.h1 | 0, h2: b.h2 | 0, h3: b.h3 | 0, hr: b.hr | 0,
+        pos: b.pos || ''                            // 该队员守过的位置（换位置后更新，换人后保留）
       };
+    });
+  });
+
+  // 把当前各棒次的守备位置记到对应队员名下（换位置后导出仍是他本人的位置）
+  [0, 1].forEach((t) => {
+    (state.batters[t] || []).forEach((nm, i) => {
+      const name = String(nm || '').trim();
+      const pos = (state.positions[t] || [])[i];
+      if (name && pos) {
+        const b = psBucket(state, t, name);
+        if (b) b.pos = String(pos);
+      }
     });
   });
 
@@ -374,13 +387,21 @@ function mergePatch(state, patch) {
                  - (parseInt(prev.scores[prevAtk][prevCol], 10) || 0);
         if (dr > 0) ps.rbi += dr;
       }
-      // 手动出局（非三振）：outs 增加且换棒 → 记 fo/ab
+      // 手动出局（非三振、非出局按钮）：outs 增加且换棒 → 记 fo/ab
       const dOut = (state.outs | 0) - prev.outs;
-      if (dh <= 0 && dOut > 0) {
+      if (dh <= 0 && dOut > 0 && !(play && play.type === 'out')) {
         ps.ab += dOut; ps.fo += dOut;
         if (psPitcher) psPitcher.bf += dOut;                       // 面对打席
       }
     }
+  }
+
+  // 出局按钮（封杀/触杀/接杀 · 击球员）：显式记到上一棒。
+  // 必须显式记——若这是第 3 个出局，同一次操作里已自动换半局、outs 归零，
+  // 上面靠 outs 差值的推断会漏掉这一笔
+  if (ps && play && play.type === 'out' && play.target !== 'runner') {
+    ps.ab += 1; ps.fo += 1;
+    if (psPitcher) psPitcher.bf += 1;                              // 面对打席
   }
 
   // 带位置失误：记防守方该守备位置 +1（1=投手 … 9=右外野）
@@ -547,12 +568,20 @@ function pitcherStat(state) {
   return state.pitchers[state.pitcher] = state.pitchers[state.pitcher] || { balls: 0, strikes: 0, h: 0, k: 0, bb: 0, bf: 0 };
 }
 
+/** 当前打者的成绩桶（按姓名；换人后保送/三振仍记到本人名下） */
+function curBatterBucket(state) {
+  const atk = attackingTeam(state);
+  const bi = Math.min((state.batters[atk] || []).length - 1, state.batterIdx[atk] | 0);
+  const nm = String((state.batters[atk] || [])[bi] || '').trim();
+  return psBucket(state, atk, nm);
+}
+
 /** 四坏球保送：打者上一垒（满垒则挤回 1 分），并换下一棒 */
 function walkBatter(state) {
   const atk = attackingTeam(state);
   const col = Math.min(MAX_INNINGS - 1, Math.max(0, state.inning - 1));
-  const ps = state.playerStats && state.playerStats[atk][state.batterIdx[atk]];
-  if (ps) ps.bb += 1;                                       // 保送记到当前打者
+  const ps = curBatterBucket(state);
+  if (ps) ps.bb += 1;                                       // 保送记到当前打者（按姓名）
   const pit = pitcherStat(state);
   if (pit) { pit.bb += 1; pit.bf += 1; }                    // 保送记到当前投手
   pushRunner(state, 0, () => {
@@ -567,8 +596,8 @@ function walkBatter(state) {
 
 /** 三振：记一个出局，并换下一棒 */
 function strikeOut(state) {
-  const ps = state.playerStats && state.playerStats[attackingTeam(state)][state.batterIdx[attackingTeam(state)]];
-  if (ps) { ps.k += 1; ps.ab += 1; }                        // 三振记到当前打者
+  const ps = curBatterBucket(state);
+  if (ps) { ps.k += 1; ps.ab += 1; }                        // 三振记到当前打者（按姓名）
   const pit = pitcherStat(state);
   if (pit) { pit.k += 1; pit.bf += 1; }                     // 三振记到当前投手
   state.strikes = 0;
@@ -662,6 +691,21 @@ function exportCSV(gameId, state) {
   lines.push(`对阵,${esc(state.teams[1])}(客) vs ${esc(state.teams[0])}(主)`);
   lines.push('');
 
+  // 逐次出局记录按队员归堆：姓名 → 三种方式次数 + 明细文字（跑垒员出局不算打者）
+  const outLogAll = Array.isArray(state.outLog) ? state.outLog : [];
+  const outByName = [{}, {}];   // [主队, 客队]
+  outLogAll.forEach((e) => {
+    if (!e || e.target === 'runner') return;
+    const t = e.half === 0 ? 1 : 0;                 // 上半局客队进攻，下半局主队进攻
+    const nm = String(e.batter || '').trim();
+    if (!nm) return;
+    if (!outByName[t][nm]) outByName[t][nm] = { 封杀: 0, 触杀: 0, 接杀: 0, details: [] };
+    const b = outByName[t][nm];
+    if (OUT_KINDS.indexOf(e.kind) >= 0) b[e.kind] += 1;
+    const seqTxt = Array.isArray(e.seq) && e.seq.length ? e.seq.join('-') : '';
+    b.details.push(`${e.kind}${seqTxt}（${e.inning | 0}局${e.half === 1 ? '下' : '上'}）`);
+  });
+
   // 客队在上、主队在下
   const ZERO_STEAL = { ok: 0, fail: 0, to2: 0, to3: 0, toH: 0 };
   const stealOf = (team) => (state.stealStats && state.stealStats[team]) || ZERO_STEAL;
@@ -675,7 +719,7 @@ function exportCSV(gameId, state) {
       return (v === '' || v == null) ? '-' : String(v);
     });
     lines.push('逐局,' + rowScore(r).join(','));
-    lines.push('打序,姓名,守备位置,打数,安打,打点,一垒安打,二垒安打,三垒安打,全垒打,保送,三振,其他出局,打击率');
+    lines.push('打序,姓名,守备位置,打数,安打,打点,一垒安打,二垒安打,三垒安打,全垒打,保送,三振,封杀,触杀,接杀,出局详情,打击率');
 
     // 队员成绩按姓名取（换人后原队员的成绩仍在他自己名下）
     const buckets = (state.pstats && state.pstats[r]) || {};
@@ -687,9 +731,17 @@ function exportCSV(gameId, state) {
       const p = (nm && buckets[nm]) || legacy[posIdx] || { ab: 0, h: 0, bb: 0, k: 0, fo: 0, rbi: 0, h1: 0, h2: 0, h3: 0, hr: 0 };
       if (p.ab || p.h || p.bb || p.k || p.fo || p.rbi) used.add(nm);
       const avg = p.ab > 0 ? (p.h / p.ab).toFixed(3) : '-';
-      const posTxt = posNameOf(posList[posIdx]);
+      // 守备位置：优先用该队员自己打过的位置（换人/换位置后仍显示他本人守过的位置）
+      const posTxt = (nm && buckets[nm] && buckets[nm].pos) ? posNameOf(buckets[nm].pos) : posNameOf(posList[posIdx]);
+      // 出局方式：封杀/触杀/接杀分列计数，出局详情写清每次怎么出局的
+      const ob = (nm && outByName[r][nm]) || { 封杀: 0, 触杀: 0, 接杀: 0, details: [] };
+      const known = (ob.封杀 | 0) + (ob.触杀 | 0) + (ob.接杀 | 0);
+      const otherN = Math.max(0, (p.fo | 0) - known);   // 未通过按钮记录方式的出局
+      let detail = ob.details.join('、');
+      if (otherN > 0) detail += (detail ? '、' : '') + `其他×${otherN}`;
       lines.push([order, esc(nm || `第${posIdx + 1}棒`), posTxt, p.ab, p.h, p.rbi,
-        p.h1 | 0, p.h2 | 0, p.h3 | 0, p.hr | 0, p.bb, p.k, p.fo, avg].join(','));
+        p.h1 | 0, p.h2 | 0, p.h3 | 0, p.hr | 0, p.bb, p.k,
+        ob.封杀 | 0, ob.触杀 | 0, ob.接杀 | 0, esc(detail || '—'), avg].join(','));
     };
     state.batters[r].forEach((name, i) => {
       if (!name) {
@@ -779,19 +831,7 @@ function exportCSV(gameId, state) {
     lines.push('');
   }
 
-  // 手动调整记录（比赛中手动改过比分 / H·E / 垒包时留档）
-  const editLog = Array.isArray(state.editLog) ? state.editLog : [];
-  if (editLog.length) {
-    lines.push('【手动调整记录】');
-    lines.push('局,半局,时间,调整内容');
-    editLog.forEach((e) => {
-      const half = (e && e.half === 1) ? '下' : '上';
-      const t = e && e.at ? new Date(e.at) : null;
-      const hhmm = t ? `${pad(t.getHours())}:${pad(t.getMinutes())}` : '';
-      lines.push([(e && e.inning) | 0, half, hhmm, esc((e && e.items || []).join('；'))].join(','));
-    });
-    lines.push('');
-  }
+  // （手动调整记录不进导出表，仅在服务端 state.editLog 内部留存）
 
   // 文件名自动带对阵双方队名（非法字符剔除，未填队名时退回编号命名）
   const clean = (s) => String(s || '').replace(/[\\/:*?"<>|\r\n]/g, '').trim();
