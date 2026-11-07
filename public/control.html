@@ -898,7 +898,18 @@ function buildBatterList(teamIdx, list) {
     const inp = document.createElement('input');
     inp.type = 'text';
     inp.placeholder = `第${i + 1}棒`;
-    bindInput(inp, (v) => Sync.setBatterName(teamIdx, i, v));
+    bindInput(inp, (v) => {
+      // 换人（改名）时提示：原队员成绩仍按姓名保留
+      const st = Sync.get();
+      const oldName = String((st.batters[teamIdx] || [])[i] || '').trim();
+      const bucket = st.pstats && st.pstats[teamIdx] ? st.pstats[teamIdx][oldName] : null;
+      const hadData = bucket && (bucket.ab || bucket.h || bucket.bb || bucket.k || bucket.fo || bucket.rbi);
+      Sync.setBatterName(teamIdx, i, v);
+      const newName = String(v || '').trim();
+      if (hadData && oldName && oldName !== newName) {
+        flash(`已换人：${oldName} → ${newName || '（空）'}｜原队员成绩仍保留在导出表`);
+      }
+    });
 
     const posBtn = document.createElement('button');
     posBtn.className = 'posbtn';
