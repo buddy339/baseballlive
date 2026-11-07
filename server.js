@@ -52,9 +52,16 @@ function defaultState() {
     outs: 0,
     bases: [false, false, false],                                // 一/二/三垒
     autoAdvance: true,                                           // 三出局自动换半局
-    errors: { 0: {}, 1: {} }                                     // 失误位置分布 { 队索引: { 位置号: 次数 } }
+    errors: { 0: {}, 1: {} },                                    // 失误位置分布 { 队索引: { 位置号: 次数 } }
+    outLog: [],                                                  // 最近出局记录（最多 40 条，服务端追加）
+    outStats: { 封杀: 0, 触杀: 0, 接杀: 0 },                       // 出局方式统计
+    outPos: {}                                                   // 守备参与位置统计 { 位置号: 次数 }
   };
 }
+
+/* 出局方式：封杀（Force）/ 触杀（Tag）/ 接杀（Catch） */
+const OUT_KINDS = ['封杀', '触杀', '接杀'];
+const OUT_LOG_MAX = 40;
 
 function getGame(id) {
   let g = games.get(id);
@@ -256,6 +263,17 @@ function mergePatch(state, patch) {
   if (!state.errors[0] || typeof state.errors[0] !== 'object') state.errors[0] = {};
   if (!state.errors[1] || typeof state.errors[1] !== 'object') state.errors[1] = {};
 
+  // 出局方式 / 守备参与 统计：重置比赛时 patch.outStats=null、outPos=null 重建
+  if (!state.outStats || typeof state.outStats !== 'object' || Array.isArray(state.outStats)) {
+    state.outStats = { 封杀: 0, 触杀: 0, 接杀: 0 };
+  }
+  OUT_KINDS.forEach((k) => { state.outStats[k] = Math.max(0, state.outStats[k] | 0); });
+  if (!state.outPos || typeof state.outPos !== 'object' || Array.isArray(state.outPos)) {
+    state.outPos = {};
+  }
+  if (!Array.isArray(state.outLog)) state.outLog = [];
+  if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
+
   // ============ 事件归因到打者（在自动结算之前判定）============
   const prevAtk = prev.half === 0 ? 1 : 0;
   const prevCol = Math.min(MAX_INNINGS - 1, Math.max(0, prev.inning - 1));
@@ -304,6 +322,28 @@ function mergePatch(state, patch) {
     // 打者因失误上垒：记打数（不算安打、不记打点），投手面对打席 +1
     if (ps) ps.ab += 1;
     if (psPitcher) psPitcher.bf += 1;
+  }
+
+  // 出局方式（封杀 / 触杀 / 接杀）：方式计数 + 守备参与位置 + 出局记录
+  // 记录按"操作前"的局面归因（出局算在上一棒打者身上）
+  if (play && play.type === 'out') {
+    const kind = OUT_KINDS.indexOf(play.kind) >= 0 ? play.kind : '封杀';
+    const seq = (Array.isArray(play.seq) ? play.seq : [])
+      .map((v) => v | 0).filter((p) => p >= 1 && p <= 9).slice(0, 4);
+    state.outStats[kind] += 1;
+    // 同一位置在一次出局里只算一次参与（如 6→3→6 只记 6 一次）
+    seq.filter((p, i) => seq.indexOf(p) === i).forEach((p) => {
+      state.outPos[p] = (state.outPos[p] | 0) + 1;
+    });
+    state.outLog.push({
+      inning: prev.inning,
+      half: prev.half,
+      batter: String((state.batters[prevAtk] && state.batters[prevAtk][prevBi]) || ''),
+      kind,
+      seq,
+      outs: Math.min(OUTS_LIMIT, (state.outs | 0))
+    });
+    if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
   }
 
   // ============ 球数自动结算（受 autoAdvance 开关统一控制）============
@@ -486,6 +526,24 @@ function exportCSV(gameId, state) {
       const kRate = p.bf > 0 ? (p.k / p.bf * 100).toFixed(1) + '%' : '-';
       lines.push([esc(name), p.strikes | 0, p.balls | 0, sRate, p.bf | 0, p.h | 0, p.k | 0, p.bb | 0, kRate].join(','));
     });
+    lines.push('');
+  }
+
+  // 出局方式与守备参与统计（封杀 / 触杀 / 接杀 + 各守备位置参与次数）
+  const outStats = state.outStats && typeof state.outStats === 'object' ? state.outStats : {};
+  const outTotal = OUT_KINDS.reduce((a, k) => a + (outStats[k] | 0), 0);
+  if (outTotal > 0) {
+    lines.push('【出局方式统计】');
+    lines.push('方式,次数,占比');
+    OUT_KINDS.forEach((k) => {
+      const n = outStats[k] | 0;
+      lines.push([k, n, outTotal ? (n / outTotal * 100).toFixed(1) + '%' : '-'].join(','));
+    });
+    lines.push(['合计', outTotal, '100%'].join(','));
+    const outPos = state.outPos && typeof state.outPos === 'object' ? state.outPos : {};
+    const posParts = Object.keys(outPos).sort((a, b) => a - b)
+      .map((p) => `${p}${posNameOf(p)}×${outPos[p] | 0}`);
+    if (posParts.length) lines.push('守备参与,' + posParts.join(', '));
     lines.push('');
   }
 

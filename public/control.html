@@ -236,6 +236,76 @@
     color: var(--cyan-l); font-size: 13px; opacity: .85;
   }
 
+  /* ---------- 出局方式（封杀 / 触杀 / 接杀） ---------- */
+  .outbtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .outbtns button {
+    min-height: 36px; padding: 3px 0; line-height: 1.1;
+    font-size: 13px; font-weight: bold; color: var(--cyan-l);
+    background: #123240; border: 1.5px solid var(--cyan); border-radius: 9px;
+  }
+  .outbtns button small { display: block; font-size: 8px; font-weight: normal; opacity: .55; letter-spacing: .5px; margin-top: 1px; }
+  .outbtns button:active { background: var(--cyan); color: #06222e; }
+  .outlast {
+    margin-top: 5px; font-size: 10px; color: var(--cyan-l); opacity: .72;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* ---------- 出局方式弹窗：守备位置多选 ---------- */
+  #outModal {
+    position: fixed; inset: 0; z-index: 64;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(0, 12, 18, .7);
+  }
+  #outModal.on { display: flex; }
+  #outModal .mcard {
+    width: min(90vw, 330px);
+    background: #0b1e28; border: 2px solid var(--cyan); border-radius: 12px;
+    padding: 13px 12px 10px; box-shadow: 0 12px 44px rgba(0, 0, 0, .6);
+  }
+  #outModal .mtitle { text-align: center; font-size: 16px; font-weight: bold; color: var(--yellow); letter-spacing: 1px; }
+  #outModal .msub { text-align: center; font-size: 11px; color: var(--cyan-l); opacity: .8; margin: 4px 0 8px; line-height: 1.5; }
+  #outModal .omseq {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    min-height: 32px; padding: 4px 7px; margin-bottom: 8px;
+    background: #071820; border: 1px dashed rgba(47, 212, 232, .45); border-radius: 8px;
+  }
+  #outModal .omempty { font-size: 11px; color: var(--cyan-l); opacity: .5; }
+  #outModal .omchip {
+    display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px;
+    font-size: 12px; font-weight: bold; color: #06222e; background: var(--yellow);
+    border-radius: 6px; cursor: pointer;
+  }
+  #outModal .omchip i { font-style: normal; font-size: 9px; opacity: .7; }
+  #outModal .omarrow { color: var(--yellow); font-size: 11px; }
+  #outModal .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  #outModal .mopt {
+    position: relative; min-height: 48px; font-size: 14px; line-height: 1.2;
+    border-radius: 10px; background: #123240; color: var(--cyan-l);
+    border: 1.5px solid var(--cyan);
+  }
+  #outModal .mopt b { font-size: 15px; }
+  #outModal .mopt small { display: block; font-size: 9px; opacity: .7; margin-top: 1px; }
+  #outModal .mopt.on { background: #4d4415; border-color: var(--yellow); color: var(--yellow); }
+  #outModal .mopt .ord {
+    position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 3px;
+    border-radius: 9px; background: var(--yellow); color: #06222e;
+    font-size: 10px; font-weight: bold; line-height: 17px; text-align: center;
+  }
+  #outModal .omhint { margin-top: 7px; font-size: 10px; line-height: 1.5; text-align: center; color: var(--cyan-l); opacity: .7; }
+  #outModal #omOk { min-height: 38px; }
+
+  /* ---------- 顶部轻提示（替代按钮文字闪现） ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 12px);
+    z-index: 90; max-width: 86vw; padding: 9px 15px;
+    background: rgba(6, 26, 34, .96); color: var(--yellow);
+    border: 1px solid var(--cyan); border-radius: 20px;
+    font-size: 12px; text-align: center; line-height: 1.4;
+    opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+    box-shadow: 0 8px 26px rgba(0, 0, 0, .5);
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
   /* ---------- 队员选择弹窗（点棒次选人，支持拼音首字母搜索） ---------- */
   #pickModal {
     position: fixed; inset: 0; z-index: 65;
@@ -383,6 +453,25 @@
   </div>
 </div>
 
+<!-- 出局方式弹窗：先选方式（封杀/触杀/接杀），再按顺序多选守备位置 1~9 -->
+<div id="outModal">
+  <div class="mcard">
+    <div class="mtitle" id="omTitle">封杀</div>
+    <div class="msub" id="omSub"></div>
+    <div class="omseq" id="omSeq"></div>
+    <div class="mgrid" id="omGrid"></div>
+    <div class="grid2" style="margin-top:8px">
+      <button class="mini" id="omUndo">⌫ 撤销一位</button>
+      <button class="mini" id="omClear">重选</button>
+    </div>
+    <div class="grid2" style="margin-top:5px">
+      <button class="mini" id="omCancel">取消</button>
+      <button class="primary" id="omOk">确定 · 记一出局</button>
+    </div>
+    <div class="omhint" id="omHint"></div>
+  </div>
+</div>
+
 <!-- 队伍库管理弹窗：提前录入所有球队及队员名单 -->
 <div id="teamModal">
   <div class="tcard">
@@ -483,6 +572,19 @@
       </div>
       <input type="file" id="orgLogoFile" accept="image/*" hidden>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="h3row">
+      <span class="h3t">出局方式</span>
+      <span class="ftip" id="outTip">点按后选守备位置</span>
+    </div>
+    <div class="outbtns">
+      <button data-out="封杀" title="封杀 Force Out：守备队员持球先于跑者踩垒">封杀<small>Force</small></button>
+      <button data-out="触杀" title="触杀 Tag Out：手套持球触及跑垒员">触杀<small>Tag</small></button>
+      <button data-out="接杀" title="接杀 Catch Out：击出的球落地前被接住">接杀<small>Catch</small></button>
+    </div>
+    <div class="outlast" id="outLast">最近出局：—</div>
   </div>
 
   </div>
@@ -637,6 +739,8 @@
 </div>
 <script src="/qrcode.min.js"></script>
 <script src="/qrhelper.js"></script>
+<div id="toast"></div>
+
 <script src="/pinyin-db.js"></script>
 <script src="/core.js"></script>
 <script>
@@ -803,6 +907,14 @@ function render(s) {
   const atk = s.half === 0 ? 1 : 0;                       // 上半局客队进攻，下半局主队进攻
   const def = s.half === 0 ? 0 : 1;
   $('heTip').textContent = `${s.teams[atk]} H${s.he[atk][0]} · ${s.teams[def]} E${s.he[def][1]}`;
+  // 出局方式卡片：本局进度 + 最近一次出局
+  const outsNow = s.outs | 0;
+  $('outTip').textContent = outsNow >= 3 ? '已满 3 出局' : `本局 ${outsNow} / 3 出局`;
+  const olog = s.outLog || [];
+  const olast = olog.length ? olog[olog.length - 1] : null;
+  $('outLast').textContent = olast
+    ? `最近：${olast.kind} ${olast.seq.join('-')}｜${olast.inning}局${olast.half === 0 ? '上' : '下'} ${olast.batter || ''}`
+    : '最近出局：—';
   $('autoSwitch').textContent = `自动:${s.autoAdvance ? '开' : '关'}`;
   $('autoSwitch').classList.toggle('sel', !!s.autoAdvance);
 
@@ -976,6 +1088,135 @@ $('pmCancel').addEventListener('click', closePlayModal);
 playModal.addEventListener('click', (e) => { if (e.target === playModal) closePlayModal(); });
 $('btnHeClear').addEventListener('click', () => {
   if (confirm('确定清除两队的 H / E 计数？')) Sync.clearHE();
+});
+
+/* ---------- 出局方式：封杀 / 触杀 / 接杀 → 守备位置多选 ---------- */
+const OUT_KIND_INFO = {
+  封杀: { en: 'Force Out', tip: '按传球顺序点位置，如 6 → 3 = 游击传一垒封杀' },
+  触杀: { en: 'Tag Out', tip: '手套持球触到跑者，如 2 = 捕手本垒触杀' },
+  接杀: { en: 'Catch Out', tip: '击出的球落地前被接住，如 8 = 中外野接杀' }
+};
+const outModal = $('outModal');
+let outKind = '封杀';
+let outSeq = [];          // 已选守备位置（按点击顺序）
+
+function outShort(kind, seq) { return `${kind} ${seq.join('-')}`; }
+function closeOutModal() { outModal.classList.remove('on'); }
+
+/** 重绘弹窗：标题、已选顺序、九宫格选中态、说明文字 */
+function renderOutModal() {
+  const s = Sync.get();
+  const atk = s.half === 0 ? 1 : 0;
+  const def = s.half === 0 ? 0 : 1;
+  const idx = s.batterIdx[atk];
+  const batter = s.batters[atk][idx] || ('第' + (idx + 1) + '棒');
+  const info = OUT_KIND_INFO[outKind] || OUT_KIND_INFO.封杀;
+
+  $('omTitle').textContent = `${outKind} · ${info.en}`;
+  $('omSub').textContent =
+    `${s.teams[def] || '防守方'} 防守 · ${s.inning}局${s.half === 0 ? '上' : '下'} · 打者 ${batter}`;
+
+  // 已选顺序条（点单个位置可删掉它）
+  const seqBox = $('omSeq');
+  seqBox.innerHTML = '';
+  if (!outSeq.length) {
+    const e = document.createElement('span');
+    e.className = 'omempty';
+    e.textContent = '尚未选择守备位置（可多选，按传球顺序点）';
+    seqBox.appendChild(e);
+  } else {
+    outSeq.forEach((n, i) => {
+      if (i) {
+        const a = document.createElement('span');
+        a.className = 'omarrow';
+        a.textContent = '→';
+        seqBox.appendChild(a);
+      }
+      const c = document.createElement('span');
+      c.className = 'omchip';
+      c.title = '点此删除该位置';
+      c.innerHTML = `${n}<i>${POS_ABBR[n] || ''}</i>`;
+      c.addEventListener('click', () => { outSeq.splice(i, 1); renderOutModal(); });
+      seqBox.appendChild(c);
+    });
+  }
+
+  // 九宫格：选中显示顺序角标
+  [...$('omGrid').children].forEach((b) => {
+    const n = Number(b.dataset.pos);
+    const at = outSeq.indexOf(n);
+    b.classList.toggle('on', at >= 0);
+    const old = b.querySelector('.ord');
+    if (old) old.remove();
+    if (at >= 0) {
+      const badge = document.createElement('span');
+      badge.className = 'ord';
+      badge.textContent = String(at + 1);
+      b.appendChild(badge);
+    }
+  });
+
+  const nextOuts = Math.min(3, (s.outs | 0) + 1);
+  $('omHint').textContent = outSeq.length
+    ? `${outSeq.map((n) => POS_NAMES[n]).join(' → ')} · ${outShort(outKind, outSeq)}｜出局 ${s.outs | 0} → ${nextOuts}`
+    : info.tip;
+  $('omOk').disabled = !outSeq.length;
+  $('omOk').textContent = outSeq.length ? `确定 · ${outShort(outKind, outSeq)}` : '确定 · 记一出局';
+}
+
+function openOutModal(kind) {
+  const s = Sync.get();
+  if ((s.outs | 0) >= 3) { flash('本局已 3 出局，请先换半局'); return; }
+  outKind = kind;
+  outSeq = [];
+  const grid = $('omGrid');
+  if (!grid.children.length) {          // 九宫格只建一次
+    for (let n = 1; n <= 9; n++) {
+      const b = document.createElement('button');
+      b.className = 'mopt';
+      b.dataset.pos = String(n);
+      b.innerHTML = `<b>${n}</b><small>${POS_NAMES[n]}</small>`;
+      b.addEventListener('click', () => toggleOutPos(n));
+      grid.appendChild(b);
+    }
+  }
+  renderOutModal();
+  outModal.classList.add('on');
+}
+
+function toggleOutPos(n) {
+  const at = outSeq.indexOf(n);
+  if (at >= 0) outSeq.splice(at, 1); else outSeq.push(n);
+  renderOutModal();
+}
+
+function commitOut() {
+  if (!outSeq.length) { flash('请先选择守备位置（可多选）'); return; }
+  const seq = outSeq.slice();
+  const kind = outKind;
+  const before = Sync.get().outs | 0;
+  Sync.outWith(kind, seq);
+  closeOutModal();
+  const txt = `${outShort(kind, seq)} · 出局 ${Math.min(3, before + 1)}/3`;
+  flash(txt + (Math.min(3, before + 1) === 3 ? ' · 三出局，换半局' : ''));
+}
+
+document.querySelectorAll('[data-out]').forEach((btn) => {
+  btn.addEventListener('click', () => openOutModal(btn.dataset.out));
+});
+$('omOk').addEventListener('click', commitOut);
+$('omCancel').addEventListener('click', closeOutModal);
+$('omUndo').addEventListener('click', () => { outSeq.pop(); renderOutModal(); });
+$('omClear').addEventListener('click', () => { outSeq = []; renderOutModal(); });
+outModal.addEventListener('click', (e) => { if (e.target === outModal) closeOutModal(); });
+
+/* 弹窗开着时支持键盘：1~9 选位置，Backspace 退一位，Enter 确定，Esc 取消 */
+document.addEventListener('keydown', (e) => {
+  if (!outModal.classList.contains('on')) return;
+  if (e.key >= '1' && e.key <= '9') { toggleOutPos(Number(e.key)); e.preventDefault(); }
+  else if (e.key === 'Backspace') { outSeq.pop(); renderOutModal(); e.preventDefault(); }
+  else if (e.key === 'Enter') { commitOut(); e.preventDefault(); }
+  else if (e.key === 'Escape') { closeOutModal(); }
 });
 
 /* ---------- 得分录入 ---------- */
@@ -1627,7 +1868,10 @@ $('btnExport').addEventListener('click', () => {
         bases: [false, false, false],
         playerStats: null,                       // 队员统计清零
         pitchers: null,                          // 投手统计清零
-        errors: null                             // 失误位置统计清零
+        errors: null,                            // 失误位置统计清零
+        outLog: [],                              // 出局记录清空
+        outStats: null,                          // 出局方式统计清零
+        outPos: null                             // 守备参与位置统计清零
       });
     })
     .catch(() => alert('导出失败：无法连接服务器'));
@@ -1664,11 +1908,15 @@ function fallbackCopy(input) {
   input.select(); input.setSelectionRange(0, 99);
   try { document.execCommand('copy'); flash('已复制'); } catch (e) { flash('请手动复制'); }
 }
+/* ---------- 轻提示：底部居中浮层，2 秒自动消失 ---------- */
+let toastTimer = null;
 function flash(msg) {
-  const btn = $('copyUrl');
-  const old = btn.textContent;
-  btn.textContent = msg;
-  setTimeout(() => { btn.textContent = old; }, 1200);
+  const t = $('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 2000);
 }
 
 /* ---------- 连接状态 ---------- */

@@ -28,8 +28,14 @@
     outs: 0,
     bases: [false, false, false],
     autoAdvance: true,
-    errors: { 0: {}, 1: {} }                 // 失误位置分布 { 队索引: { 守备位置号: 次数 } }
+    errors: { 0: {}, 1: {} },                // 失误位置分布 { 队索引: { 守备位置号: 次数 } }
+    outLog: [],                               // 最近出局记录（服务端追加，最多 40 条）
+    outStats: { 封杀: 0, 触杀: 0, 接杀: 0 },   // 出局方式统计
+    outPos: {}                                // 守备参与位置统计 { 位置号: 次数 }
   };
+
+  /* 出局方式（守备位置序列：1 投手 … 9 右外野） */
+  const OUT_KINDS = ['封杀', '触杀', '接杀'];
 
   /* 场次基址：/g/2/... 页面下所有请求自动带 /g/2 前缀；旧地址则归 1 号场 */
   const BASE = (function () {
@@ -219,8 +225,26 @@
     return { he, bases, scores, batterIdx, balls: 0, strikes: 0, play: { type: 'error', pos: pos | 0, runs: r.n } };
   }
 
-  /* ---- 便捷操作方法 ---- */
-  const api = {
+  /**
+   * 出局方式（封杀 / 触杀 / 接杀）+ 守备位置序列
+   *  seq 为传球/触杀顺序，如 [6,3] = 游击传一垒；[8] = 中外野接杀
+   * 记一出局、换下一棒、B/S 清零；满 3 出局由服务端自动换半局
+   */
+  function simulateOut(kind, seq) {
+    const atk = attackingTeam();
+    const outs = Math.min(OUTS_LIMIT, (state.outs | 0) + 1);
+    const batterIdx = state.batterIdx.slice();
+    batterIdx[atk] = nextBatterIdxOf(atk);
+    return {
+      outs,
+      batterIdx,
+      balls: 0,
+      strikes: 0,
+      play: { type: 'out', kind: kind, seq: seq.slice(0, 4) }
+    };
+  }
+
+  /* ---- 便捷操作方法 ---- */  const api = {
     MAX_INNINGS,
     COUNTS,
     OUTS_LIMIT,
@@ -376,6 +400,14 @@
       patch({ bases });
     },
 
+    /** 出局方式：封杀/触杀/接杀 + 守备位置序列（如 ['6','3']） */
+    outWith(kind, seq) {
+      const k = OUT_KINDS.indexOf(kind) >= 0 ? kind : '封杀';
+      const s = (Array.isArray(seq) ? seq : []).map((v) => v | 0).filter((p) => p >= 1 && p <= 9);
+      patch(simulateOut(k, s));
+    },
+    OUT_KINDS,
+
     /** 安打：进攻方 H +1 并推进垒包；失误：防守方 E +1 */
     hit() { patch(simulateHit()); },
     error() { patch(simulateError()); },
@@ -397,7 +429,10 @@
         batterIdx: [0, 0],                             // 清空比赛数据但保留两队打序名单
         playerStats: null,                             // 队员统计一并清零
         pitchers: null,                                // 投手统计一并清零
-        errors: null                                   // 失误位置统计一并清零
+        errors: null,                                  // 失误位置统计一并清零
+        outLog: [],                                    // 出局记录一并清空
+        outStats: null,                                // 出局方式统计一并清零
+        outPos: null                                   // 守备参与位置统计一并清零
       });
     }
   };
