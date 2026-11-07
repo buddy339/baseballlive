@@ -250,6 +250,21 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
+  /* ---------- 出局对象切换：击球员 / 跑垒员（垒上出局） ---------- */
+  #omTarget { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  #omTarget button {
+    min-height: 34px; font-size: 13px; border-radius: 8px;
+    background: #123240; color: var(--cyan-l); border: 1.5px solid var(--cyan);
+  }
+  #omTarget button.on { background: var(--yellow); border-color: var(--yellow); color: #06222e; font-weight: bold; }
+  #omBaseRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+  #omBaseRow button {
+    min-height: 34px; font-size: 13px; border-radius: 8px;
+    background: #123240; color: var(--cyan-l); border: 1.5px solid var(--cyan);
+  }
+  #omBaseRow button.on { background: var(--yellow); border-color: var(--yellow); color: #06222e; font-weight: bold; }
+  #omBaseRow button:disabled { opacity: .35; }
+
   /* ---------- 弹窗外壳（出局方式 / 盗垒 共用） ---------- */
   .pop {
     position: fixed; inset: 0; z-index: 64;
@@ -461,6 +476,15 @@
   <div class="mcard">
     <div class="mtitle" id="omTitle">封杀</div>
     <div class="msub" id="omSub"></div>
+    <div id="omTarget">
+      <button data-tg="batter" class="on">击球员出局</button>
+      <button data-tg="runner">跑垒员出局</button>
+    </div>
+    <div id="omBaseRow" style="display:none">
+      <button data-b="1">一垒</button>
+      <button data-b="2">二垒</button>
+      <button data-b="3">三垒</button>
+    </div>
     <div class="omseq" id="omSeq"></div>
     <div class="mgrid" id="omGrid"></div>
     <div class="grid2" style="margin-top:8px">
@@ -1148,6 +1172,8 @@ const OUT_KIND_INFO = {
 const outModal = $('outModal');
 let outKind = '封杀';
 let outSeq = [];          // 已选守备位置（按点击顺序）
+let outTarget = 'batter'; // 'batter' 击球员出局 | 'runner' 跑垒员出局（垒上出局）
+let outBase = 0;          // 跑垒员出局所在的垒：1/2/3（0=未指定）
 
 function outShort(kind, seq) { return `${kind} ${seq.join('-')}`; }
 function closeOutModal() { outModal.classList.remove('on'); }
@@ -1205,12 +1231,39 @@ function renderOutModal() {
     }
   });
 
+  // 出局对象切换：击球员 / 跑垒员
+  const runnerMode = outTarget === 'runner';
+  [...$('omTarget').children].forEach((b) => {
+    b.classList.toggle('on', b.dataset.tg === outTarget);
+  });
+  const baseRow = $('omBaseRow');
+  baseRow.style.display = runnerMode ? 'grid' : 'none';
+  if (runnerMode) {
+    const bases = s.bases || [false, false, false];
+    [...baseRow.children].forEach((b) => {
+      const bi = Number(b.dataset.b) - 1;
+      b.classList.toggle('on', Number(b.dataset.b) === outBase);
+      b.disabled = !bases[bi];         // 空垒不能选
+    });
+  }
+
   const nextOuts = Math.min(3, (s.outs | 0) + 1);
-  $('omHint').textContent = outSeq.length
-    ? `${outSeq.map((n) => POS_NAMES[n]).join(' → ')} · ${outShort(outKind, outSeq)}｜出局 ${s.outs | 0} → ${nextOuts}`
-    : info.tip;
+  const baseName = { 1: '一垒', 2: '二垒', 3: '三垒' }[outBase] || '';
+  if (runnerMode) {
+    $('omHint').textContent = outSeq.length
+      ? `${outSeq.map((n) => POS_NAMES[n]).join(' → ')} · ${outShort(outKind, outSeq)}｜${baseName || '垒上'}跑者出局 ${s.outs | 0} → ${nextOuts}（不换棒、球数不变）`
+      : (outBase
+        ? `${baseName}跑者出局：不换棒、球数不变、不计打数｜出局 ${s.outs | 0} → ${nextOuts}`
+        : '垒上无人或未指定垒包：仍可按"击球员出局"记录');
+  } else {
+    $('omHint').textContent = outSeq.length
+      ? `${outSeq.map((n) => POS_NAMES[n]).join(' → ')} · ${outShort(outKind, outSeq)}｜出局 ${s.outs | 0} → ${nextOuts}`
+      : info.tip;
+  }
   $('omOk').disabled = !outSeq.length;
-  $('omOk').textContent = outSeq.length ? `确定 · ${outShort(outKind, outSeq)}` : '确定 · 记一出局';
+  $('omOk').textContent = outSeq.length
+    ? `确定 · ${runnerMode ? '跑者出局' : '击球员出局'}`
+    : '确定 · 记一出局';
 }
 
 function openOutModal(kind) {
@@ -1218,6 +1271,8 @@ function openOutModal(kind) {
   if ((s.outs | 0) >= 3) { flash('本局已 3 出局，请先换半局'); return; }
   outKind = kind;
   outSeq = [];
+  outTarget = 'batter';
+  outBase = 0;
   const grid = $('omGrid');
   if (!grid.children.length) {          // 九宫格只建一次
     for (let n = 1; n <= 9; n++) {
@@ -1247,18 +1302,42 @@ function commitOut() {
   const seq = outSeq.slice();
   const kind = outKind;
   const before = s0.outs | 0;
-  Sync.outWith(kind, seq);
+  const runnerMode = outTarget === 'runner';
+  const baseName = { 1: '一垒', 2: '二垒', 3: '三垒' }[outBase] || '跑者';
+  const who = runnerMode ? `${baseName}跑者` : batter;
+  Sync.outWith(kind, seq, runnerMode ? 'runner' : 'batter', runnerMode ? outBase : 0);
   closeOutModal();
   // 立即回显（不依赖推送，断网时也能看到刚记的一笔）
   $('outLast').textContent =
-    `最近：${outShort(kind, seq)}｜${s0.inning}局${s0.half === 0 ? '上' : '下'} ${batter}`;
-  const txt = `${outShort(kind, seq)} · 出局 ${Math.min(3, before + 1)}/3`;
+    `最近：${runnerMode ? '跑者·' : ''}${outShort(kind, seq)}｜${s0.inning}局${s0.half === 0 ? '上' : '下'} ${who}`;
+  const txt = `${runnerMode ? baseName + '跑者出局 · ' : ''}${outShort(kind, seq)} · 出局 ${Math.min(3, before + 1)}/3`;
   flash(txt + (Math.min(3, before + 1) === 3 ? ' · 三出局，换半局' : ''));
 }
 
 document.querySelectorAll('[data-out]').forEach((btn) => {
   btn.addEventListener('click', () => openOutModal(btn.dataset.out));
 });
+// 击球员 / 跑垒员切换
+[...$('omTarget').children].forEach((b) => {
+  b.addEventListener('click', () => {
+    outTarget = b.dataset.tg === 'runner' ? 'runner' : 'batter';
+    if (outTarget === 'runner' && !outBase) {
+      // 自动选中第一个有人的垒
+      const bases = Sync.get().bases || [false, false, false];
+      const at = bases.findIndex(Boolean);
+      outBase = at >= 0 ? at + 1 : 0;
+    }
+    renderOutModal();
+  });
+});
+[...$('omBaseRow').children].forEach((b) => {
+  b.addEventListener('click', () => {
+    const n = Number(b.dataset.b);
+    outBase = outBase === n ? 0 : n;
+    renderOutModal();
+  });
+});
+
 $('omOk').addEventListener('click', commitOut);
 $('omCancel').addEventListener('click', closeOutModal);
 $('omUndo').addEventListener('click', () => { outSeq.pop(); renderOutModal(); });
@@ -2090,6 +2169,7 @@ $('btnExport').addEventListener('click', () => {
         innings: 7,                              // 延长赛用过的局数复位
         bases: [false, false, false],
         playerStats: null,                       // 队员统计清零
+        pstats: null,                            // 按姓名的队员成绩一并清零
         pitchers: null,                          // 投手统计清零
         errors: null,                            // 失误位置统计清零
         outLog: [],                              // 出局记录清空

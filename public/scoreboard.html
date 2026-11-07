@@ -146,7 +146,9 @@ function buildTable(s) {
   const showLogo = logos.some(Boolean);        // 两队都没传队徽 → 整列不显示
   const hideE = s.ageGroup === 'U8' || s.ageGroup === 'U10';   // U8/U10 不显示 E 列
   theadRow.innerHTML = '<th>队伍</th>' + (showLogo ? '<th class="logoCol"></th>' : '');
-  for (let i = 1; i <= s.innings; i++) {
+  // 打到延长赛时表头要跟到当前局（第 10 局以后也能显示分数）
+  const cols = Math.min(Sync.MAX_INNINGS, Math.max(s.innings | 0, s.inning | 0, 1));
+  for (let i = 1; i <= cols; i++) {
     const th = document.createElement('th');
     th.textContent = i;
     theadRow.appendChild(th);
@@ -182,9 +184,11 @@ function buildTable(s) {
       tr.appendChild(logoTd);
     }
 
-    for (let c = 0; c < s.innings; c++) {
+    for (let c = 0; c < cols; c++) {
       const td = document.createElement('td');
-      td.textContent = s.scores[r][c] || '';
+      // 0 分要显示成 0（原来 0 会变成空白，看不出是没打还是得 0 分）
+      const v = s.scores[r][c];
+      td.textContent = (v === '' || v == null) ? '' : String(v);
       td.contentEditable = true;
       bindText(td, () => Sync.setScore(r, c, td.textContent.trim()));
       tr.appendChild(td);

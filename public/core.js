@@ -1,6 +1,6 @@
 /* core.js —— 状态同步核心（挂件页与控制端共用） */
 (function (global) {
-  const MAX_INNINGS = 9;
+  const MAX_INNINGS = 12;
   /* 圆点个数：改这里时记得与 server.js 的 COUNTS 保持一致 */
   const COUNTS = { balls: 3, strikes: 2, outs: 2 };
   const OUTS_LIMIT = COUNTS.outs + 1;          // 出局满 3 才换半局（圈只有 2 个）
@@ -235,9 +235,25 @@
    *  seq 为传球/触杀顺序，如 [6,3] = 游击传一垒；[8] = 中外野接杀
    * 记一出局、换下一棒、B/S 清零；满 3 出局由服务端自动换半局
    */
-  function simulateOut(kind, seq) {
+  /**
+   * 出局：kind 封杀/触杀/接杀；seq 守备位置序列
+   * target = 'batter' 击球员出局（默认：换下一棒、球数清零）
+   *          'runner' 跑垒员出局（垒上出局：不换棒、球数不变、可指定清掉哪个垒）
+   */
+  function simulateOut(kind, seq, target, base) {
     const atk = attackingTeam();
     const outs = Math.min(OUTS_LIMIT, (state.outs | 0) + 1);
+    const runnerOut = target === 'runner';
+    if (runnerOut) {
+      const bases = cloneBases();
+      const b = (base | 0) - 1;
+      if (b >= 0 && b <= 2) bases[b] = false;
+      return {
+        outs,
+        bases,
+        play: { type: 'out', kind: kind, seq: seq.slice(0, 4), target: 'runner', base: base | 0 }
+      };
+    }
     const batterIdx = state.batterIdx.slice();
     batterIdx[atk] = nextBatterIdxOf(atk);
     return {
@@ -245,7 +261,7 @@
       batterIdx,
       balls: 0,
       strikes: 0,
-      play: { type: 'out', kind: kind, seq: seq.slice(0, 4) }
+      play: { type: 'out', kind: kind, seq: seq.slice(0, 4), target: 'batter' }
     };
   }
 
@@ -443,10 +459,10 @@
     },
 
     /** 出局方式：封杀/触杀/接杀 + 守备位置序列（如 ['6','3']） */
-    outWith(kind, seq) {
+    outWith(kind, seq, target, base) {
       const k = OUT_KINDS.indexOf(kind) >= 0 ? kind : '封杀';
       const s = (Array.isArray(seq) ? seq : []).map((v) => v | 0).filter((p) => p >= 1 && p <= 9);
-      patch(simulateOut(k, s));
+      patch(simulateOut(k, s, target === 'runner' ? 'runner' : 'batter', base | 0));
     },
     OUT_KINDS,
 
@@ -481,6 +497,7 @@
         bases: [false, false, false],
         batterIdx: [0, 0],                             // 清空比赛数据但保留两队打序名单
         playerStats: null,                             // 队员统计一并清零
+        pstats: null,                                  // 按姓名的队员成绩一并清零
         pitchers: null,                                // 投手统计一并清零
         errors: null,                                  // 失误位置统计一并清零
         outLog: [],                                    // 出局记录一并清空

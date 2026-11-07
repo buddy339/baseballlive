@@ -18,7 +18,7 @@ const os = require('os');
 
 const PORT = Number(process.env.PORT) || 8080;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const MAX_INNINGS = 9;
+const MAX_INNINGS = 12;
 
 /* 圆点个数：坏球 / 好球 / 出局（出局画 2 个圈，但满 3 才换半局） */
 const COUNTS = { balls: 3, strikes: 2, outs: 2 };
@@ -44,6 +44,7 @@ function defaultState() {
     pitcher: '',                                                 // 留空则不显示在挂件上
     batters: [Array(9).fill(''), Array(9).fill('')],             // 打序名单 [主队, 客队]，各 9~10 棒
     positions: [Array(9).fill(''), Array(9).fill('')],           // 每棒守备位置 [主队, 客队]，'1'~'9'/'DH'/空
+    pstats: [{}, {}],                                            // 队员成绩（按姓名记账，换人不丢）
     batterIdx: [0, 0],                                           // 各队当前棒次 [主队, 客队]
     inning: 1,
     half: 0,                                                     // 0=上 1=下
@@ -184,7 +185,8 @@ function mergePatch(state, patch) {
     balls: state.balls | 0,
     strikes: state.strikes | 0,
     he: (state.he || [[0, 0], [0, 0]]).map((r) => r.slice()),
-    scores: state.scores.map((r) => r.slice())
+    scores: state.scores.map((r) => r.slice()),
+    batters: (state.batters || [[], []]).map((r) => r.slice())   // 换人前的人名，用于成绩归因
   };
 
   // play 是本次操作的“记分意图”（安打类型 / 失误位置），只用于统计归因，不写入状态
@@ -245,6 +247,36 @@ function mergePatch(state, patch) {
     normStats(state.playerStats && state.playerStats[0]),
     normStats(state.playerStats && state.playerStats[1])
   ];
+
+  // 队员成绩按【姓名】记账（换人/换棒次后原队员数据不再被顶替）
+  // 首次升级时把旧的按棒次统计迁移到姓名桶里
+  if (!Array.isArray(state.pstats) || state.pstats.length !== 2
+      || !state.pstats[0] || typeof state.pstats[0] !== 'object'
+      || !state.pstats[1] || typeof state.pstats[1] !== 'object') {
+    const migrated = [{}, {}];
+    [0, 1].forEach((t) => {
+      state.batters[t].forEach((nm, i) => {
+        const s0 = state.playerStats[t][i];
+        const name = String(nm || '').trim();
+        if (!name || !s0) return;
+        if ((s0.ab | 0) + (s0.h | 0) + (s0.bb | 0) + (s0.k | 0) + (s0.fo | 0) + (s0.rbi | 0) === 0) return;
+        migrated[t][name] = { ...s0 };
+      });
+    });
+    const had = Array.isArray(state.pstats) && state.pstats.length === 2;
+    state.pstats = had
+      ? [{ ...(state.pstats[0] || {}), ...migrated[0] }, { ...(state.pstats[1] || {}), ...migrated[1] }]
+      : migrated;
+  }
+  [0, 1].forEach((t) => {
+    Object.keys(state.pstats[t]).forEach((nm) => {
+      const b = state.pstats[t][nm];
+      state.pstats[t][nm] = {
+        ab: b.ab | 0, h: b.h | 0, bb: b.bb | 0, k: b.k | 0, fo: b.fo | 0, rbi: b.rbi | 0,
+        h1: b.h1 | 0, h2: b.h2 | 0, h3: b.h3 | 0, hr: b.hr | 0
+      };
+    });
+  });
 
   // 投手统计：按投手姓名分桶 { 名: {balls,strikes,h,k,bb,bf} }；重置比赛时 patch.pitchers=null 清空
   if (!state.pitchers || typeof state.pitchers !== 'object' || Array.isArray(state.pitchers)) {
@@ -308,7 +340,10 @@ function mergePatch(state, patch) {
   const prevCol = Math.min(MAX_INNINGS - 1, Math.max(0, prev.inning - 1));
   const prevBi = Math.min(len - 1, prev.batterIdx[prevAtk] || 0);
   const idxChanged = state.batterIdx[prevAtk] !== prevBi;
-  const ps = state.playerStats[prevAtk][prevBi];
+  // 刚完成打击的是"上一棒"的姓名（换人后仍归到原来的队员名下）
+  const psName = String(((prev.batters[prevAtk] || [])[prevBi]) || '').trim()
+    || String(((state.batters[prevAtk] || [])[prevBi]) || '').trim();
+  const ps = psBucket(state, prevAtk, psName);
   const playHit = play && play.type === 'hit';
   const playErr = play && play.type === 'error';
 
@@ -364,12 +399,25 @@ function mergePatch(state, patch) {
     seq.filter((p, i) => seq.indexOf(p) === i).forEach((p) => {
       state.outPos[p] = (state.outPos[p] | 0) + 1;
     });
+    // 跑垒员出局：把所在的垒清掉（1/2/3 → 一/二/三垒）
+    const runnerOut = play.target === 'runner';
+    if (runnerOut) {
+      const b = (play.base | 0) - 1;
+      if (b >= 0 && b <= 2) {
+        state.bases = state.bases.slice();
+        state.bases[b] = false;
+      }
+    }
     state.outLog.push({
       inning: prev.inning,
       half: prev.half,
-      batter: String((state.batters[prevAtk] && state.batters[prevAtk][prevBi]) || ''),
+      batter: runnerOut
+        ? `${PLAY_BASE_NAME[play.base | 0] || '跑垒员'}`
+        : String((state.batters[prevAtk] && state.batters[prevAtk][prevBi]) || ''),
       kind,
       seq,
+      target: runnerOut ? 'runner' : 'batter',
+      base: runnerOut ? (play.base | 0) : 0,
       outs: Math.min(OUTS_LIMIT, (state.outs | 0))
     });
     if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
@@ -412,6 +460,20 @@ function mergePatch(state, patch) {
     if (state.strikes >= STRIKES_LIMIT) strikeOut(state);     // 三好球 → 三振
     if (state.outs >= OUTS_LIMIT) advanceHalf(state);         // 三出局 → 换半局
   }
+}
+
+const PLAY_BASE_NAME = { 1: '一垒跑者', 2: '二垒跑者', 3: '三垒跑者' };
+
+/** 队员成绩桶：按姓名记账，换人后新队员从 0 开始，原队员数据保留 */
+function psBucket(state, team, name) {
+  const nm = String(name || '').trim();
+  if (!nm) return null;
+  if (!Array.isArray(state.pstats) || state.pstats.length !== 2) state.pstats = [{}, {}];
+  if (!state.pstats[team] || typeof state.pstats[team] !== 'object') state.pstats[team] = {};
+  if (!state.pstats[team][nm]) {
+    state.pstats[team][nm] = { ab: 0, h: 0, bb: 0, k: 0, fo: 0, rbi: 0, h1: 0, h2: 0, h3: 0, hr: 0 };
+  }
+  return state.pstats[team][nm];
 }
 
 /** 进攻方索引：上半局客队(1)，下半局主队(0) */
@@ -473,6 +535,11 @@ function clamp(v, max) { return Math.min(max, Math.max(0, v | 0)); }
 
 /** 推进到下一个半局，并清零球数与垒包 */
 function advanceHalf(state) {
+  // 这一半局已经打完：没得分就补 0，避免记分板留空（看起来像"还没打"）
+  const atkDone = attackingTeam(state);
+  const colDone = Math.min(MAX_INNINGS - 1, Math.max(0, state.inning - 1));
+  const curDone = state.scores[atkDone][colDone];
+  if (curDone === '' || curDone == null) state.scores[atkDone][colDone] = '0';
   if (state.half === 0) {
     state.half = 1;
   } else if (state.inning < state.innings) {
@@ -555,15 +622,42 @@ function exportCSV(gameId, state) {
   [1, 0].forEach((r) => {
     const runs = state.scores[r].reduce((a, v) => a + (parseInt(v, 10) || 0), 0);
     lines.push(`【${esc(state.teams[r])}】 总得分 R=${runs}  安打 H=${state.he[r][0] | 0}  失误 E=${state.he[r][1] | 0}`);
+    // 逐局比分：没打的局用 - 占位，得 0 分明确写 0（不再留空）
+    const innN = Math.min(MAX_INNINGS, Math.max(state.innings | 0, state.inning | 0, 1));
+    const rowScore = (t) => Array.from({ length: innN }, (_, i) => {
+      const v = state.scores[t][i];
+      return (v === '' || v == null) ? '-' : String(v);
+    });
+    lines.push('逐局,' + rowScore(r).join(','));
     lines.push('打序,姓名,守备位置,打数,安打,打点,一垒安打,二垒安打,三垒安打,全垒打,保送,三振,其他出局,打击率');
-    const stats = (state.playerStats && state.playerStats[r]) || [];
+
+    // 队员成绩按姓名取（换人后原队员的成绩仍在他自己名下）
+    const buckets = (state.pstats && state.pstats[r]) || {};
     const posList = (state.positions && state.positions[r]) || [];
-    state.batters[r].forEach((name, i) => {
-      const p = stats[i] || { ab: 0, h: 0, bb: 0, k: 0, fo: 0, rbi: 0, h1: 0, h2: 0, h3: 0, hr: 0 };
-      if (!name && !(p.ab || p.h || p.bb || p.k || p.fo || p.rbi)) return;   // 空名且无数据 → 跳过
+    const legacy = (state.playerStats && state.playerStats[r]) || [];
+    const used = new Set();
+    const putRow = (order, name, posIdx) => {
+      const nm = String(name || '').trim();
+      const p = (nm && buckets[nm]) || legacy[posIdx] || { ab: 0, h: 0, bb: 0, k: 0, fo: 0, rbi: 0, h1: 0, h2: 0, h3: 0, hr: 0 };
+      if (p.ab || p.h || p.bb || p.k || p.fo || p.rbi) used.add(nm);
       const avg = p.ab > 0 ? (p.h / p.ab).toFixed(3) : '-';
-      const posTxt = posNameOf(posList[i]);
-      lines.push([i + 1, esc(name || `第${i + 1}棒`), posTxt, p.ab, p.h, p.rbi, p.h1 | 0, p.h2 | 0, p.h3 | 0, p.hr | 0, p.bb, p.k, p.fo, avg].join(','));
+      const posTxt = posNameOf(posList[posIdx]);
+      lines.push([order, esc(nm || `第${posIdx + 1}棒`), posTxt, p.ab, p.h, p.rbi,
+        p.h1 | 0, p.h2 | 0, p.h3 | 0, p.hr | 0, p.bb, p.k, p.fo, avg].join(','));
+    };
+    state.batters[r].forEach((name, i) => {
+      if (!name) {
+        const p = legacy[i];
+        if (!p || !(p.ab || p.h || p.bb || p.k || p.fo || p.rbi)) return;   // 空名且无数据 → 跳过
+      }
+      putRow(i + 1, name, i);
+    });
+    // 中途被换下的队员：单独补一行，成绩不丢
+    Object.keys(buckets).forEach((nm) => {
+      if (used.has(nm)) return;
+      const p = buckets[nm];
+      if (!(p.ab || p.h || p.bb || p.k || p.fo || p.rbi)) return;
+      putRow(`换下·${nm}`, nm, 0);
     });
     // 失误位置明细（如：E1×2, E5×1）
     const errs = state.errors && state.errors[r] ? state.errors[r] : {};
