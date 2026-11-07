@@ -45,6 +45,7 @@ function defaultState() {
     batters: [Array(9).fill(''), Array(9).fill('')],             // 打序名单 [主队, 客队]，各 9~10 棒
     positions: [Array(9).fill(''), Array(9).fill('')],           // 每棒守备位置 [主队, 客队]，'1'~'9'/'DH'/空
     pstats: [{}, {}],                                            // 队员成绩（按姓名记账，换人不丢）
+    editLog: [],                                                 // 手动调整记录（改比分/改垒包/H/E）
     batterIdx: [0, 0],                                           // 各队当前棒次 [主队, 客队]
     inning: 1,
     half: 0,                                                     // 0=上 1=下
@@ -186,7 +187,8 @@ function mergePatch(state, patch) {
     strikes: state.strikes | 0,
     he: (state.he || [[0, 0], [0, 0]]).map((r) => r.slice()),
     scores: state.scores.map((r) => r.slice()),
-    batters: (state.batters || [[], []]).map((r) => r.slice())   // 换人前的人名，用于成绩归因
+    batters: (state.batters || [[], []]).map((r) => r.slice()),  // 换人前的人名，用于成绩归因
+    bases: (state.bases || [false, false, false]).slice()
   };
 
   // play 是本次操作的“记分意图”（安打类型 / 失误位置），只用于统计归因，不写入状态
@@ -204,6 +206,9 @@ function mergePatch(state, patch) {
       state[key] = val;
     }
   }
+  // 手动调整（改比分 / H·E / 垒包）留痕
+  logManualEdits(state, prev, play);
+
   // 安全边界
   state.inning = Math.min(MAX_INNINGS, Math.max(1, state.inning | 0));
   state.half = state.half ? 1 : 0;
@@ -309,6 +314,8 @@ function mergePatch(state, patch) {
   if (!state.outPos || typeof state.outPos !== 'object' || Array.isArray(state.outPos)) {
     state.outPos = {};
   }
+  if (!Array.isArray(state.editLog)) state.editLog = [];
+  if (state.editLog.length > 60) state.editLog = state.editLog.slice(-60);
   if (!Array.isArray(state.outLog)) state.outLog = [];
   if (state.outLog.length > OUT_LOG_MAX) state.outLog = state.outLog.slice(-OUT_LOG_MAX);
 
@@ -463,6 +470,45 @@ function mergePatch(state, patch) {
 }
 
 const PLAY_BASE_NAME = { 1: '一垒跑者', 2: '二垒跑者', 3: '三垒跑者' };
+
+/**
+ * 手动调整记录：没有 play 意图却改了比分 / H·E / 垒包 → 记一条，导出表里能看到
+ * （换半局自动补 0、自动结算等不计入）
+ */
+function logManualEdits(state, prev, play) {
+  if (play) return;
+  const items = [];
+  [0, 1].forEach((t) => {
+    for (let c = 0; c < MAX_INNINGS; c++) {
+      const a = String(prev.scores[t][c] == null ? '' : prev.scores[t][c]);
+      const b = String(state.scores[t][c] == null ? '' : state.scores[t][c]);
+      if (a === b) continue;
+      if (a === '' && b === '0') continue;          // 换局补 0 不算手动修改
+      items.push(`${state.teams[t]} 第${c + 1}局 ${a || '-'}→${b || '-'}`);
+    }
+    [0, 1].forEach((i) => {
+      const a = prev.he[t][i] | 0, b = state.he[t][i] | 0;
+      if (a !== b) items.push(`${state.teams[t]} ${i ? 'E' : 'H'} ${a}→${b}`);
+    });
+  });
+  // 垒包：局面没变时的开关才算手动调整（换局/换棒自动清垒不计）
+  const sameSituation = prev.inning === state.inning && prev.half === state.half
+    && (prev.outs | 0) === (state.outs | 0);
+  if (sameSituation) {
+    const bn = ['一垒', '二垒', '三垒'];
+    for (let i = 0; i < 3; i++) {
+      if (!!prev.bases[i] !== !!state.bases[i]) {
+        items.push(`${bn[i]} ${prev.bases[i] ? '有人' : '空'}→${state.bases[i] ? '有人' : '空'}`);
+      }
+    }
+  }
+  if (!items.length) return;
+  state.editLog.push({
+    inning: prev.inning, half: prev.half,
+    at: Date.now(), items: items.slice(0, 12)
+  });
+  if (state.editLog.length > 60) state.editLog = state.editLog.slice(-60);
+}
 
 /** 队员成绩桶：按姓名记账，换人后新队员从 0 开始，原队员数据保留 */
 function psBucket(state, team, name) {
@@ -729,6 +775,20 @@ function exportCSV(gameId, state) {
         const posTxt = seq.map((p) => `${p}${posNameOf(p)}`).join('→');
         lines.push([(e && e.inning) | 0, half, esc(teamName), '失败', '', posTxt].join(','));
       }
+    });
+    lines.push('');
+  }
+
+  // 手动调整记录（比赛中手动改过比分 / H·E / 垒包时留档）
+  const editLog = Array.isArray(state.editLog) ? state.editLog : [];
+  if (editLog.length) {
+    lines.push('【手动调整记录】');
+    lines.push('局,半局,时间,调整内容');
+    editLog.forEach((e) => {
+      const half = (e && e.half === 1) ? '下' : '上';
+      const t = e && e.at ? new Date(e.at) : null;
+      const hhmm = t ? `${pad(t.getHours())}:${pad(t.getMinutes())}` : '';
+      lines.push([(e && e.inning) | 0, half, hhmm, esc((e && e.items || []).join('；'))].join(','));
     });
     lines.push('');
   }

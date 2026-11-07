@@ -500,6 +500,7 @@
         pstats: null,                                  // 按姓名的队员成绩一并清零
         pitchers: null,                                // 投手统计一并清零
         errors: null,                                  // 失误位置统计一并清零
+        editLog: [],                                   // 手动调整记录一并清空
         outLog: [],                                    // 出局记录一并清空
         outStats: null,                                // 出局方式统计一并清零
         outPos: null,                                  // 守备参与位置统计一并清零
